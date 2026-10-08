@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.log
+
+# Virtual environments
+.venv/
+venv/
+
+# Generated outputs (re-create by running the CLI)
+results/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+~$*
+
+# Local secrets / environment
+.env
+.env.*
+
+# Notebooks / figures scratch
+*.ipynb_checkpoints/
+
+# External tool artifacts
+# NOTE: tavottofile/ and tavotto_registry.json are intentionally KEPT in the repo.
+.tavottofile/
+
+# Generated study data (Analysis90/ is kept)
+data/noise/
+data/stationkeeping/
+data/evasive/
+data/studies/
+data/study/
