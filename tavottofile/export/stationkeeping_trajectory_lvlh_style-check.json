@@ -1,0 +1,301 @@
+{
+ "kind": "tavotto-proof",
+ "version": 3,
+ "stem": "stationkeeping_trajectory_lvlh",
+ "profile": {
+  "profile_id": "lab-publication-v1",
+  "profile_version": "1.1.0",
+  "label": "课题组出版规范 v1"
+ },
+ "page_mm": {
+  "w": 150,
+  "h": 100,
+  "margin": 0
+ },
+ "dpi": 600,
+ "formats": [
+  "pdf",
+  "png"
+ ],
+ "checks": [
+  {
+   "id": "font-too-large",
+   "severity": "warn",
+   "text": "图内文字的有效字号 17.52 pt 超过 12 pt，已大于正文字号。",
+   "count": 1,
+   "object_ids": [
+    "p_r5wlwncn"
+   ],
+   "gids": [
+    "axes_0.xlabel",
+    "axes_0.ylabel",
+    "axes_0.zlabel",
+    "axes_0.texts_0",
+    "axes_0.texts_1",
+    "axes_0.texts_2",
+    "axes_0.legend",
+    "axes_0.legend.texts_0",
+    "axes_0.legend.texts_1",
+    "axes_0.legend.texts_2",
+    "axes_0.legend.texts_3",
+    "axes_0.legend.texts_4",
+    "axes_0.xticks",
+    "axes_0.yticks",
+    "axes_0.zticks",
+    "axes_1.xlabel",
+    "axes_1.ylabel",
+    "axes_1.texts_0",
+    "axes_1.texts_1",
+    "axes_1.xticks",
+    "axes_1.yticks"
+   ],
+   "detail": {
+    "effective_pt": 17.52,
+    "max_pt": 12
+   }
+  },
+  {
+   "id": "font-family-substituted",
+   "severity": "warn",
+   "text": "图内文字用 sans-serif，规范要求 Times New Roman；该字体是常见替代品，说明目标字体未安装。",
+   "count": 1,
+   "object_ids": [
+    "p_r5wlwncn"
+   ],
+   "gids": [
+    "axes_0.xlabel",
+    "axes_0.ylabel",
+    "axes_0.zlabel",
+    "axes_0.texts_0",
+    "axes_0.texts_1",
+    "axes_0.texts_2",
+    "axes_0.legend.texts_0",
+    "axes_0.legend.texts_1",
+    "axes_0.legend.texts_2",
+    "axes_0.legend.texts_3",
+    "axes_0.legend.texts_4",
+    "axes_0.xticks",
+    "axes_0.yticks",
+    "axes_0.zticks",
+    "axes_1.xlabel",
+    "axes_1.ylabel",
+    "axes_1.texts_0",
+    "axes_1.texts_1",
+    "axes_1.xticks",
+    "axes_1.yticks"
+   ],
+   "detail": {
+    "family": "sans-serif"
+   }
+  },
+  {
+   "id": "text-weight-policy",
+   "severity": "suggestion",
+   "text": "规范建议 axis_label 的字重为 bold，当前 normal。",
+   "count": 1,
+   "object_ids": [
+    "p_r5wlwncn"
+   ],
+   "gids": [
+    "axes_0.xlabel",
+    "axes_0.ylabel",
+    "axes_0.zlabel",
+    "axes_1.xlabel",
+    "axes_1.ylabel"
+   ],
+   "detail": {
+    "role": "axis_label",
+    "want": "bold",
+    "got": "normal"
+   }
+  },
+  {
+   "id": "legend-frame",
+   "severity": "warn",
+   "text": "图例带边框，规范要求图例无框",
+   "count": 1,
+   "object_ids": [
+    "p_r5wlwncn"
+   ],
+   "gids": [
+    "axes_0.legend"
+   ],
+   "detail": {}
+  },
+  {
+   "id": "legend-font-size",
+   "severity": "warn",
+   "text": "图例字号的有效值 15.57 pt 不在规范的 8–9 pt 之间。",
+   "count": 1,
+   "object_ids": [
+    "p_r5wlwncn"
+   ],
+   "gids": [
+    "axes_0.legend"
+   ],
+   "detail": {
+    "effective_pt": 15.57
+   }
+  },
+  {
+   "id": "line-width-off-preset",
+   "severity": "warn",
+   "text": "线宽的有效值 2.92 pt 不在规范档位 0.5/0.75/1/1.5 pt 上。",
+   "count": 1,
+   "object_ids": [
+    "p_r5wlwncn"
+   ],
+   "gids": [
+    "axes_0.legend.texts_0",
+    "axes_0.legend.texts_1",
+    "axes_1.lines_0",
+    "axes_1.lines_1",
+    "axes_1.lines_2"
+   ],
+   "detail": {
+    "effective_pt": 2.92
+   }
+  },
+  {
+   "id": "tick-direction",
+   "severity": "warn",
+   "text": "刻度朝向为 out，规范要求 in",
+   "count": 1,
+   "object_ids": [
+    "p_r5wlwncn"
+   ],
+   "gids": [
+    "axes_1.xticks",
+    "axes_1.yticks"
+   ],
+   "detail": {
+    "direction": "out",
+    "want": "in"
+   }
+  },
+  {
+   "id": "tick-label-count",
+   "severity": "suggestion",
+   "text": "axes_0.yticklabels 有 11 个刻度标签，规范建议不超过 10 个。",
+   "count": 1,
+   "object_ids": [
+    "p_r5wlwncn"
+   ],
+   "gids": [
+    "axes_0.yticklabels",
+    "axes_1.xticklabels"
+   ],
+   "detail": {
+    "count": 11
+   }
+  },
+  {
+   "id": "palette-line-markers",
+   "severity": "suggestion",
+   "text": "6 条曲线都没有 marker，黑白打印或色觉障碍读者难以区分。可考虑加 marker 或用不同线型。",
+   "count": 1,
+   "object_ids": [
+    "p_r5wlwncn"
+   ],
+   "gids": [
+    "axes_1"
+   ],
+   "detail": {
+    "lines": 6
+   }
+  },
+  {
+   "id": "element-outside-figure",
+   "severity": "error",
+   "text": "有元素超出图幅 4618.83 mm，导出时会裁掉超出的部分。",
+   "count": 1,
+   "object_ids": [
+    "p_r5wlwncn"
+   ],
+   "gids": [
+    "axes_0.texts_0",
+    "axes_0.texts_1"
+   ],
+   "detail": {
+    "overflow_mm": 4618.83,
+    "side": "top"
+   }
+  },
+  {
+   "id": "out-of-page",
+   "severity": "error",
+   "text": "对象超出页面范围，超出部分不会出现在成图里",
+   "count": 1,
+   "object_ids": [
+    "p_r5wlwncn"
+   ],
+   "gids": [],
+   "detail": {}
+  }
+ ],
+ "check_counts": {
+  "error": 2,
+  "warn": 6,
+  "not_verifiable": 0,
+  "suggestion": 3
+ },
+ "not_verifiable": [],
+ "forced": true,
+ "acknowledged": [
+  "element-outside-figure",
+  "out-of-page"
+ ],
+ "check_failed": false,
+ "acknowledged_check_failed": false,
+ "objects": [
+  {
+   "type": "panel",
+   "name": "stationkeeping_trajectory_lvlh",
+   "file": "results\\stationkeeping\\truth\\stationkeeping_trajectory_lvlh.pdf",
+   "mtime": 1790497481,
+   "script": "plot_dynamics.py",
+   "overrides": 22,
+   "rect_mm": [
+    -23.89,
+    -56.81,
+    197.78,
+    247.23
+   ]
+  }
+ ],
+ "scope": "original",
+ "ppi": 600,
+ "background": "white",
+ "files": [
+  {
+   "name": "stationkeeping_trajectory_lvlh.pdf",
+   "format": "pdf",
+   "bytes": 20459,
+   "px": null,
+   "mm": [
+    203.2,
+    254.0
+   ],
+   "vector": true
+  },
+  {
+   "name": "stationkeeping_trajectory_lvlh.png",
+   "format": "png",
+   "bytes": 641921,
+   "px": [
+    4800,
+    6000
+   ],
+   "mm": [
+    203.2,
+    254.0
+   ],
+   "vector": false
+  }
+ ],
+ "ignored_transforms": [
+  "scale"
+ ],
+ "exported_at": "2026-09-27 16:34:26",
+ "tavotto_version": "0.15.0"
+}

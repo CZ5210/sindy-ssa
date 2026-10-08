@@ -1,0 +1,20 @@
+{
+ "version": 1,
+ "scripts": {
+  "plot_dynamics.py": {
+   "entry": "main",
+   "cost": "medium",
+   "notes": "",
+   "stems": [
+    "noise_mee_tier_violin",
+    "noise_rtn_selected_histogram",
+    "stationkeeping_thrust_true",
+    "stationkeeping_trajectory_eci",
+    "stationkeeping_trajectory_lvlh",
+    "evasive_thrust_true",
+    "evasive_trajectory_eci",
+    "evasive_trajectory_lvlh"
+   ]
+  }
+ }
+}

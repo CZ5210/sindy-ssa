@@ -1,0 +1,198 @@
+{
+ "kind": "tavotto-proof",
+ "version": 3,
+ "stem": "evasive_thrust_true",
+ "profile": {
+  "profile_id": "lab-publication-v1",
+  "profile_version": "1.1.0",
+  "label": "课题组出版规范 v1"
+ },
+ "page_mm": {
+  "w": 150,
+  "h": 100,
+  "margin": 0
+ },
+ "dpi": 600,
+ "formats": [
+  "pdf",
+  "png"
+ ],
+ "checks": [
+  {
+   "id": "font-too-large",
+   "severity": "warn",
+   "text": "图内文字的有效字号 19.29 pt 超过 12 pt，已大于正文字号。",
+   "count": 1,
+   "object_ids": [
+    "p_gjtbyivz"
+   ],
+   "gids": [
+    "axes_0.ylabel",
+    "axes_0.yticks",
+    "axes_1.ylabel",
+    "axes_1.yticks",
+    "axes_2.xlabel",
+    "axes_2.ylabel",
+    "axes_2.xticks",
+    "axes_2.yticks"
+   ],
+   "detail": {
+    "effective_pt": 19.29,
+    "max_pt": 12
+   }
+  },
+  {
+   "id": "font-family-substituted",
+   "severity": "warn",
+   "text": "图内文字用 sans-serif，规范要求 Times New Roman；该字体是常见替代品，说明目标字体未安装。",
+   "count": 1,
+   "object_ids": [
+    "p_gjtbyivz"
+   ],
+   "gids": [
+    "axes_0.ylabel",
+    "axes_0.yticks",
+    "axes_1.ylabel",
+    "axes_1.yticks",
+    "axes_2.xlabel",
+    "axes_2.ylabel",
+    "axes_2.xticks",
+    "axes_2.yticks"
+   ],
+   "detail": {
+    "family": "sans-serif"
+   }
+  },
+  {
+   "id": "text-weight-policy",
+   "severity": "suggestion",
+   "text": "规范建议 axis_label 的字重为 bold，当前 normal。",
+   "count": 1,
+   "object_ids": [
+    "p_gjtbyivz"
+   ],
+   "gids": [
+    "axes_0.ylabel",
+    "axes_1.ylabel",
+    "axes_2.xlabel",
+    "axes_2.ylabel"
+   ],
+   "detail": {
+    "role": "axis_label",
+    "want": "bold",
+    "got": "normal"
+   }
+  },
+  {
+   "id": "line-width-off-preset",
+   "severity": "warn",
+   "text": "线宽的有效值 1.93 pt 不在规范档位 0.5/0.75/1/1.5 pt 上。",
+   "count": 1,
+   "object_ids": [
+    "p_gjtbyivz"
+   ],
+   "gids": [
+    "axes_0.lines_0",
+    "axes_1.lines_0",
+    "axes_2.lines_0"
+   ],
+   "detail": {
+    "effective_pt": 1.93
+   }
+  },
+  {
+   "id": "tick-direction",
+   "severity": "warn",
+   "text": "刻度朝向为 out，规范要求 in",
+   "count": 1,
+   "object_ids": [
+    "p_gjtbyivz"
+   ],
+   "gids": [
+    "axes_0.yticks",
+    "axes_1.yticks",
+    "axes_2.xticks",
+    "axes_2.yticks"
+   ],
+   "detail": {
+    "direction": "out",
+    "want": "in"
+   }
+  },
+  {
+   "id": "out-of-page",
+   "severity": "error",
+   "text": "对象超出页面范围，超出部分不会出现在成图里",
+   "count": 1,
+   "object_ids": [
+    "p_gjtbyivz"
+   ],
+   "gids": [],
+   "detail": {}
+  }
+ ],
+ "check_counts": {
+  "error": 1,
+  "warn": 4,
+  "not_verifiable": 0,
+  "suggestion": 1
+ },
+ "not_verifiable": [],
+ "forced": true,
+ "acknowledged": [
+  "out-of-page"
+ ],
+ "check_failed": false,
+ "acknowledged_check_failed": false,
+ "objects": [
+  {
+   "type": "panel",
+   "name": "evasive_thrust_true",
+   "file": "results\\evasive\\truth\\evasive_thrust_true.pdf",
+   "mtime": 1790507489,
+   "script": "plot_dynamics.py",
+   "overrides": 9,
+   "rect_mm": [
+    -35.24,
+    -61.51,
+    220.48,
+    220.48
+   ]
+  }
+ ],
+ "scope": "original",
+ "ppi": 600,
+ "background": "white",
+ "files": [
+  {
+   "name": "evasive_thrust_true.pdf",
+   "format": "pdf",
+   "bytes": 14205,
+   "px": null,
+   "mm": [
+    228.6,
+    228.6
+   ],
+   "vector": true
+  },
+  {
+   "name": "evasive_thrust_true.png",
+   "format": "png",
+   "bytes": 400665,
+   "px": [
+    5400,
+    5400
+   ],
+   "mm": [
+    228.6,
+    228.6
+   ],
+   "vector": false
+  }
+ ],
+ "ignored_transforms": [
+  "scale"
+ ],
+ "exported_at": "2026-09-27 19:16:11",
+ "tavotto_version": "0.15.0"
+}

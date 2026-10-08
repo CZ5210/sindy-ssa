@@ -1,0 +1,82 @@
+# Unified configuration for both scenarios (station-keeping + evasive).
+# 统一配置：两个场景（站位保持 + 规避）共用一个文件。
+#
+# Satellite / observation / SINDy / paths are shared; scenario-specific fields
+# live under ``scenarios:``.  Both scenarios are always validated together.
+
+satellite:
+  drag_coefficient: 2.5
+  cross_section_area: 120.0        # m^2
+  exhaust_velocity: 24525.0        # m/s (Isp * g0)
+  dry_mass: 720.0                  # kg
+  initial_mass: 800.0              # kg
+  max_thrust: 0.17                 # N
+
+observation:
+  sampling_rate: 6                 # down-sampling of the truth ephemeris
+  noise:                           # one entry per typical case; keys become case names
+    ideal:
+      mode: none                   # noise-free ideal reconstruction
+      seed: 0
+    reduced:
+      mode: gaussian               # gaussian (MEE-space injection)
+      tier: reduced                # low | high | reduced (Table tab:MEE_std)
+      seed: 0
+    low:
+      mode: gaussian
+      tier: low
+      seed: 0
+    high:
+      mode: gaussian
+      tier: high
+      seed: 0
+
+sindy:
+  smoothing_window_seconds: 1428.0   # T_w ≈ 23.8 min
+  meefd_spline_smoothing_factor: 0.02 # MEEFD-Spline: s = factor * n * var(y); larger = smoother
+  interpolation_rate: 6              # keep equal to observation.sampling_rate
+  original_alpha: 1.0
+  original_max_iter: 20
+  time_alpha: 1.0e-3
+  time_max_iter: 25
+  time_kappa: 1.0e-19
+  umee_alpha: 1.0e-4
+  umee_max_iter: 30
+  normalize_columns: true            # L2-normalise MEE library columns
+  time_normalize_columns: false      # time library is already well scaled
+  sparsity_tol: 0.02                 # relative RSS tolerance for L-curve selection
+  prediction:                        # partial-window future prediction
+    enabled: true                   # fit on the first fit_fraction of the manoeuvre
+    fit_fraction: 0.75
+    future_state: reference          # reference (causal) | observed (non-causal)
+
+paths:
+  data_root: data
+  figures_root: results
+  noise_data_dir: data/noise
+  noise_figures_dir: results/noise
+
+scenarios:
+  stationkeeping:
+    name: stationkeeping
+    duration_hours: 50.0
+    step_seconds: 10.0
+    orbit_altitude: 530.0
+    orbit_inclination: 43.0
+    box_size: [5.0, 40.0, 5.0]
+    box_shift: 0.0
+    stationkeeping_control:
+      q_diag: [10.0, 5.0, 0.01, 20.0, 30.0, 20.0]
+      r_diag: [1.0, 1.0, 1.0]
+
+  evasive:
+    name: evasive
+    duration_hours: 10.0
+    step_seconds: 10.0
+    orbit_altitude: 530.0
+    orbit_inclination: 43.0
+    target_position: [0.0, -20.0, 0.0]
+    time_of_flight_hours: 4.0
+    evasive_control:
+      q_diag: [3000.0, 3000.0, 0.01, 500.0, 500.0, 20.0]
+      r_diag: [1.0, 1.0, 1.0]

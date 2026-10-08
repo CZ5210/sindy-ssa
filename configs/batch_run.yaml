@@ -1,0 +1,40 @@
+# Dedicated configuration for the Monte-Carlo batch study.
+# 蒙特卡洛批量统计专用配置。
+#
+# This file inherits EVERYTHING from ``config.yaml`` via ``base:`` and only
+# overrides the ``batch:`` block.  Satellite, observation/noise, SINDy and
+# scenario settings are therefore defined once in ``config.yaml``.
+#
+# ``sindy-ssa batch run`` / ``sindy-ssa batch plot`` use this file by default:
+#
+#     sindy-ssa batch run
+#     sindy-ssa batch plot
+#
+# Override from the command line as needed:
+#     sindy-ssa batch run --runs 5 --case high
+#     sindy-ssa batch run --data-root data/_pilot --figures-root results/_pilot
+#     sindy-ssa batch run --config configs/config.yaml   # use the main config
+#
+# To change the underlying scenario/noise/SINDy settings, edit ``config.yaml``;
+# do not repeat them here.
+
+base: config.yaml
+
+batch:
+  runs: 100                     # number of Monte-Carlo noise realisations
+  seed0: 0                      # base seed; run i uses seed0 + i
+  cases: [ideal, high, low, reduced]   # 'ideal' = single deterministic run
+  overview_log: true            # batch_overview y-axis: true = log, false = linear
+
+  # Partial-window prediction for the batch.  When ``enabled: true`` the model is
+  # fit on the first ``fit_fraction`` of the manoeuvre and evaluated over the full
+  # arc: only the four predictive methods (TIME-OLS, SINDy, SINDy-TIME,
+  # SINDy-UMEE) participate, and batch_summary.csv lists just those.  When
+  # ``enabled: false`` the full six-method comparison is run.
+  #
+  # Omit the whole ``prediction:`` block to inherit ``sindy.prediction`` from
+  # config.yaml instead.
+  prediction:
+    enabled: true
+    fit_fraction: 0.50          # fit on the first 75% of the manoeuvre arc
+    future_state: reference     # reference (causal) | observed (non-causal)

@@ -1,0 +1,117 @@
+{
+ "kind": "tavotto-proof",
+ "version": 3,
+ "stem": "noise_rtn_selected_histogram",
+ "profile": {
+  "profile_id": "lab-publication-v1",
+  "profile_version": "1.1.0",
+  "label": "课题组出版规范 v1"
+ },
+ "page_mm": {
+  "w": 150,
+  "h": 100,
+  "margin": 0
+ },
+ "dpi": 600,
+ "formats": [
+  "pdf",
+  "png"
+ ],
+ "checks": [
+  {
+   "id": "raster-text-not-verifiable",
+   "severity": "not_verifiable",
+   "text": "位图没有矢量文字层，字号无法核验。请确认最终字号大于规范下限。",
+   "count": 1,
+   "object_ids": [
+    "p_aqn51o1c"
+   ],
+   "gids": [],
+   "detail": {}
+  },
+  {
+   "id": "out-of-page",
+   "severity": "error",
+   "text": "对象超出页面范围，超出部分不会出现在成图里",
+   "count": 1,
+   "object_ids": [
+    "p_aqn51o1c"
+   ],
+   "gids": [],
+   "detail": {}
+  }
+ ],
+ "check_counts": {
+  "error": 1,
+  "warn": 0,
+  "not_verifiable": 1,
+  "suggestion": 0
+ },
+ "not_verifiable": [
+  {
+   "id": "raster-text-not-verifiable",
+   "text": "位图没有矢量文字层，字号无法核验。请确认最终字号大于规范下限。",
+   "object_ids": [
+    "p_aqn51o1c"
+   ]
+  }
+ ],
+ "forced": true,
+ "acknowledged": [
+  "out-of-page",
+  "raster-text-not-verifiable"
+ ],
+ "check_failed": false,
+ "acknowledged_check_failed": false,
+ "objects": [
+  {
+   "type": "panel",
+   "name": "noise_rtn_selected_histogram",
+   "file": "results\\noise\\noise_rtn_selected_histogram.png",
+   "mtime": 1790140235,
+   "script": "plot_dynamics.py",
+   "overrides": 7,
+   "rect_mm": [
+    -74.94,
+    -30.81,
+    299.89,
+    162.44
+   ]
+  }
+ ],
+ "scope": "original",
+ "ppi": 600,
+ "background": "white",
+ "files": [
+  {
+   "name": "noise_rtn_selected_histogram.pdf",
+   "format": "pdf",
+   "bytes": 37709,
+   "px": null,
+   "mm": [
+    304.8,
+    165.1
+   ],
+   "vector": true
+  },
+  {
+   "name": "noise_rtn_selected_histogram.png",
+   "format": "png",
+   "bytes": 455183,
+   "px": [
+    7200,
+    3900
+   ],
+   "mm": [
+    304.8,
+    165.1
+   ],
+   "vector": false
+  }
+ ],
+ "ignored_transforms": [
+  "scale"
+ ],
+ "exported_at": "2026-09-23 13:13:37",
+ "tavotto_version": "0.15.0"
+}
