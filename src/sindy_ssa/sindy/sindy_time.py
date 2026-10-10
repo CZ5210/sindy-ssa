@@ -44,7 +44,8 @@ def run_sindy_time(raw_path: str, cfg: AppConfig, out_dir: str, thrust_path: str
         library, optimizer, Xi, theta, selected_iter, path = fit_ssr_auto(
             spec, t, u, normalize_columns=cfg.sindy.time_normalize_columns,
             tol=cfg.sindy.sparsity_tol)
-        save_selection(path, selected_iter, os.path.join(out_dir, "selection.json"))
+        save_selection(path, selected_iter, os.path.join(out_dir, "selection.json"),
+                   tol=cfg.sindy.sparsity_tol, alpha=alpha)
     else:
         spec = time_library(level, alpha=alpha, max_iter=max_iter, kappa=kappa)
         library, optimizer, Xi, theta = fit_ssr(

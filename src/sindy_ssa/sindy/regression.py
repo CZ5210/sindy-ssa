@@ -134,7 +134,7 @@ def fit_ssr_path(spec: LibrarySpec, X: np.ndarray, Y: np.ndarray,
         })
     return library, theta, path
 
-DEFAULT_SPARSITY_TOL = 0.05
+DEFAULT_SPARSITY_TOL = 0.02
 
 
 def pareto_frontier(path: list[dict]):
@@ -210,11 +210,12 @@ def fit_ssr_auto(spec: LibrarySpec, X: np.ndarray, Y: np.ndarray,
 
 
 def save_selection(path: list[dict], selected_iter: int, out_path: str,
-                   tol: float = DEFAULT_SPARSITY_TOL) -> None:
-    """Save the L-curve path, selected point and the sparsity tolerance as JSON."""
+                   tol: float = DEFAULT_SPARSITY_TOL, alpha: float | None = None) -> None:
+    """Save the L-curve path, selected point and the selection settings as JSON."""
     payload = {
         "selected_max_iter": selected_iter,
         "sparsity_tol": tol,
+        "ridge_alpha": alpha,
         "path": [
             {"max_iter": p["max_iter"], "rss": p["rss"], "n_active": p["n_active"]}
             for p in path

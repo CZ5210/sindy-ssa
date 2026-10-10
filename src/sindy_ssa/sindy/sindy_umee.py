@@ -51,7 +51,8 @@ def run_sindy_umee(observe_path: str, raw_path: str, cfg: AppConfig, out_dir: st
         library, optimizer, Xi, theta, selected_iter, path = fit_ssr_auto(
             spec, X, u, normalize_columns=cfg.sindy.normalize_columns,
             tol=cfg.sindy.sparsity_tol)
-        save_selection(path, selected_iter, os.path.join(out_dir, "selection.json"))
+        save_selection(path, selected_iter, os.path.join(out_dir, "selection.json"),
+                   tol=cfg.sindy.sparsity_tol, alpha=cfg.sindy.umee_alpha)
     else:
         spec = umee_library(cfg.sindy.umee_max_iter, cfg.sindy.umee_alpha)
         library, optimizer, Xi, theta = fit_ssr(

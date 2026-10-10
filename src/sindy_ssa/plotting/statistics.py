@@ -863,9 +863,12 @@ def _plot_one_selection(ax, path: str) -> int:
     sel_idx = iters.index(selected)
 
     ax.plot(n_active, rss, "o-", color="steelblue", markersize=3, linewidth=1, zorder=2)
+    order = np.argsort(n_active)
+    envelope = np.minimum.accumulate(rss[order])
+    ax.step(n_active[order], envelope, where="post", color="darkorange",
+            linewidth=1.4, zorder=3)
     ax.plot(n_active[sel_idx], rss[sel_idx], "ro", markersize=9, zorder=4)
-    ax.set_xlabel("Retained coefficients", fontsize=FONT_SIZE + 1)
-    ax.set_ylabel("RSS", fontsize=FONT_SIZE + 1)
+    ax.set_xlabel(r"$n_a$", fontsize=FONT_SIZE + 1)
     ax.tick_params(axis="both", labelsize=FONT_SIZE - 1)
     ax.grid(True, alpha=0.3)
     return int(n_active[sel_idx])
@@ -879,9 +882,9 @@ def plot_selection_path(path, save_path=None, title=None, show=False):
     - a list of ``(path, label)`` tuples to render multiple methods in one figure.
 
     When multiple paths are given they are arranged in a single figure with one
-    subplot per method, a shared legend outside the axes ("SSR path" /
-    "selected sparsity"), and per-subplot titles showing the method name and
-    the number of retained terms.
+    subplot per method, a shared legend outside the axes (``RSS(n_a)`` /
+    ``\\overline{RSS}(n_a)``), and per-subplot titles showing the method name
+    and the number of retained terms.
     """
     if isinstance(path, (str, os.PathLike)):
         paths = [(path, title)]
@@ -907,9 +910,10 @@ def plot_selection_path(path, save_path=None, title=None, show=False):
 
     line_proxy = plt.Line2D([0], [0], color="steelblue", marker="o", markersize=3,
                             linewidth=1, linestyle="-")
-    point_proxy = plt.Line2D([0], [0], color="r", marker="o", markersize=9,
-                             linestyle="None")
-    fig.legend([line_proxy, point_proxy], ["SSR path", "selected sparsity"],
+    env_proxy = plt.Line2D([0], [0], color="darkorange", linewidth=1.4)
+    fig.legend([line_proxy, env_proxy],
+               [r"$\mathrm{RSS}(n_a)$",
+                r"$\overline{\mathrm{RSS}}(n_a)$"],
                loc="center left", bbox_to_anchor=(1.02, 0.5), fontsize=LEGEND_FONT_SIZE + 1)
 
     fig.tight_layout()

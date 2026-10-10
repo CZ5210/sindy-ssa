@@ -53,7 +53,8 @@ def run_sindy_original(observe_path: str, cfg: AppConfig, out_dir: str, thrust_p
         library, optimizer, Xi, theta, selected_iter, path = fit_ssr_auto(
             spec, X, Xdot, normalize_columns=cfg.sindy.normalize_columns,
             tol=cfg.sindy.sparsity_tol)
-        save_selection(path, selected_iter, os.path.join(out_dir, "selection.json"))
+        save_selection(path, selected_iter, os.path.join(out_dir, "selection.json"),
+                   tol=cfg.sindy.sparsity_tol, alpha=cfg.sindy.original_alpha)
     else:
         spec = original_library(cfg.sindy.original_max_iter, cfg.sindy.original_alpha)
         library, optimizer, Xi, theta = fit_ssr(
