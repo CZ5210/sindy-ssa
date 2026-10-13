@@ -82,6 +82,19 @@ METHOD_COLORS = {m: c for m, c in zip(ACC_METHODS, ACC_COLOR) if m != "True"}
 # figure (e.g. the non-predictive MEEFD baselines in partial-window mode).
 METHOD_ORDER = tuple(m for m in ACC_METHODS if m != "True")
 
+# Canonical marker per method for the versus-window charts, keyed by name like
+# METHOD_COLORS so the four predictive methods keep the glyph they are drawn with
+# when the two non-predictive MEEFD baselines are added to the figure.  Those two
+# only ever appear as a single-window box glyph at 100% observed.
+METHOD_MARKERS = {
+    "MEEFD-SG": "v",
+    "MEEFD-Spline": "P",
+    "TIME-OLS": "o",
+    "SINDy": "s",
+    "SINDy-TIME": "^",
+    "SINDy-UMEE": "D",
+}
+
 
 def method_palette_index(label, fallback):
     """Return the canonical palette index for ``label`` or ``fallback``."""

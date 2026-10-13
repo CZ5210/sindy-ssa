@@ -10,12 +10,12 @@ import numpy as np
 import pandas as pd
 from matplotlib import colormaps
 from matplotlib.cm import ScalarMappable
-from matplotlib.colors import LinearSegmentedColormap, Normalize
+from matplotlib.colors import LinearSegmentedColormap, Normalize, to_rgba
 from matplotlib.patches import Patch, Rectangle
 from matplotlib.ticker import LogFormatterMathtext, LogLocator, NullFormatter
 from scipy.stats import gaussian_kde
 
-from .style import FONT_SIZE, LEGEND_FONT_SIZE, METHOD_COLORS, save_figure
+from .style import FONT_SIZE, LEGEND_FONT_SIZE, METHOD_COLORS, METHOD_MARKERS, save_figure
 
 _COLORS = ["lightcoral", "skyblue", "palegreen", "peachpuff", "plum", "lightyellow", "lightgray"]
 
@@ -396,6 +396,32 @@ def plot_metric_tiers(case_data, noise_cases, ideal_case=None,
 
 
 _WINDOW_MARKERS = ["o", "s", "^", "D", "v", "P"]
+# Width (observed-fraction units) of the box glyph drawn for a method that has a
+# single window, and the fill alpha it shares with the convergence bands.
+_SINGLE_WINDOW_BOX = 4.0
+_SINGLE_WINDOW_ALPHA = 0.2
+
+
+def _draw_single_window(ax, x: float, median: float, q1: float, q3: float,
+                        color, marker: str) -> None:
+    """Box glyph for a method that is observed at one window only.
+
+    The non-predictive MEEFD baselines cannot be fitted on a partial window, so
+    they contribute the fully observed (100%) sample alone.  The glyph borrows
+    the look of the connected methods: the interquartile box is tinted with the
+    same translucent shade as their convergence bands, its four edges are drawn
+    in the method colour, and the median is the method marker.  The fill alpha is
+    baked into the face colour so the edges stay fully opaque.
+    """
+    half = _SINGLE_WINDOW_BOX / 2.0
+    if q3 > q1:
+        ax.add_patch(
+            Rectangle((x - half, q1), _SINGLE_WINDOW_BOX, q3 - q1,
+                      facecolor=to_rgba(color, _SINGLE_WINDOW_ALPHA),
+                      edgecolor=color, linewidth=1.6, zorder=3)
+        )
+    ax.plot([x], [median], marker=marker, markersize=7, linestyle="none",
+            color=color, zorder=4)
 
 
 def plot_metric_vs_window(case_data, windows, tiers, ideal_data=None, save_path=None,
@@ -411,6 +437,11 @@ def plot_metric_vs_window(case_data, windows, tiers, ideal_data=None, save_path=
     is supplied an extra deterministic ``Ideal`` column is appended, drawn as
     single markers with no band.  Methods share the global colour palette;
     ``log_scale`` selects a logarithmic y-axis.
+
+    ``methods`` may also list a method that exists in one window only---the two
+    non-predictive MEEFD baselines are evaluated on the fully observed arc and
+    appear nowhere else.  Those are drawn at their single window as the box glyph
+    of :func:`_draw_single_window` and get a marker-only legend entry.
     """
     rows = [
         (r"$\mathcal{EPE}_{\mathrm{2D}}$ (km)", "epe_planar"),
@@ -438,8 +469,11 @@ def plot_metric_vs_window(case_data, windows, tiers, ideal_data=None, save_path=
 
     ordered = list(methods) if methods else list(dict.fromkeys(ref["method"].astype(str)))
     colors = [METHOD_COLORS.get(m, _COLORS[i % len(_COLORS)]) for i, m in enumerate(ordered)]
-    markers = [_WINDOW_MARKERS[i % len(_WINDOW_MARKERS)] for i in range(len(ordered))]
+    markers = [METHOD_MARKERS.get(m, _WINDOW_MARKERS[i % len(_WINDOW_MARKERS)])
+               for i, m in enumerate(ordered)]
 
+    drawn: set[int] = set()
+    single: set[int] = set()
     fig, axes = plt.subplots(
         len(rows), len(columns), figsize=(4.4 * len(columns), 8.6),
         squeeze=False, sharex=False, sharey=False,
@@ -464,6 +498,13 @@ def plot_metric_vs_window(case_data, windows, tiers, ideal_data=None, save_path=
                     q3s.append(float(np.percentile(values, 75)))
                 if not xs:
                     continue
+                drawn.add(i)
+                if len(xs) == 1:
+                    # One window only: a box glyph instead of a line.
+                    single.add(i)
+                    _draw_single_window(ax, xs[0], meds[0], q1s[0], q3s[0],
+                                        colors[i], markers[i])
+                    continue
                 ax.plot(xs, meds, marker=markers[i], color=colors[i],
                         linewidth=1.8, markersize=7, label=method, zorder=3)
                 if not is_ideal:
@@ -471,6 +512,10 @@ def plot_metric_vs_window(case_data, windows, tiers, ideal_data=None, save_path=
 
             ax.set_xticks(windows)
             ax.set_xticklabels([str(w) for w in windows], fontsize=FONT_SIZE - 2)
+            # Pin matplotlib's default 5% margin: the single-window box glyph is
+            # centred on the last fraction and needs that room beside the frame.
+            margin = 0.05 * (max(windows) - min(windows))
+            ax.set_xlim(min(windows) - margin, max(windows) + margin)
             ax.set_xlabel("Observed fraction (%)", fontsize=FONT_SIZE + 2)
             if c == 0:
                 ax.set_ylabel(ylabel, fontsize=FONT_SIZE + 2)
@@ -482,10 +527,15 @@ def plot_metric_vs_window(case_data, windows, tiers, ideal_data=None, save_path=
             if log_scale:
                 _log_y_integer_powers(ax)
 
+    # A single-window method gets a marker-only legend entry, so the two glyph
+    # families (convergence lines vs. the 100%-only box) are told apart.
     proxies = [
+        plt.Line2D([0], [0], color=colors[i], marker=markers[i],
+                   linestyle="none", markersize=7, label=ordered[i])
+        if i in single else
         plt.Line2D([0], [0], color=colors[i], marker=markers[i], linewidth=1.8,
                    markersize=7, label=ordered[i])
-        for i in range(len(ordered))
+        for i in sorted(drawn)
     ]
     fig.legend(
         handles=proxies, loc="center left", bbox_to_anchor=(1.0, 0.5),
@@ -535,11 +585,13 @@ _HEATMAP_MEDIAN_RANGE = (0.45, 1.0)
 _HEATMAP_IQR_RANGE = (0.45, 1.0)
 
 
-def _summary_fmt(value) -> str:
-    """Format a summary statistic with a fixed three decimal places.
+def _summary_fmt(value, decimals: int = 2) -> str:
+    """Format a summary statistic with a fixed number of decimal places.
 
     Falls back to ``--`` for missing values (e.g. the interquartile range of the
-    single-run ideal case).
+    single-run ideal case).  A non-zero value that would round to zero is
+    reported as ``<`` the column resolution instead, so a small interquartile
+    range is not mistaken for an exact zero.
     """
     if value is None:
         return "--"
@@ -549,33 +601,56 @@ def _summary_fmt(value) -> str:
         return "--"
     if not np.isfinite(value):
         return "--"
-    return f"{value:.3f}"
+    text = f"{value:.{decimals}f}"
+    if value and float(text) == 0.0:
+        return f"<{10.0 ** -decimals:.{decimals}f}"
+    return text
 
 
 def _metric_values(group, methods, column):
     """Finite values of one metric column over the methods of a row group."""
+    block_key, tier, stat = column
+    data = _block_data(group, block_key)
     values = []
     for method in methods:
-        raw = group["data"].get(method, {}).get(column[0], {}).get(column[1])
+        raw = data.get(method, {}).get(tier, {}).get(stat)
         if raw is not None and np.isfinite(float(raw)):
             values.append(float(raw))
     return values
 
 
+def _block_data(group, block_key):
+    """Per-method data of one column block (``block_key=None`` → flat layout)."""
+    if block_key is None:
+        return group["data"]
+    return group["data"].get(block_key, {})
+
+
 def plot_summary_heatmap(row_groups, save_path=None,
                          median_cmap="OrRd", iqr_cmap="Blues",
                          median_range=None, iqr_range=None,
-                         fontsize=8.5, method_col_width=1.9, data_col_width=1.0,
+                         blocks=None, decimals=2,
+                         fontsize=8.5, method_col_width=1.45, data_col_width=0.54,
                          row_height=1.0, show=False, png=True):
     """Coloured "Median + IQR" summary table (heatmap-style figure).
 
     Renders a table into a matplotlib figure so it can replace the hand-written
-    result tables.  The columns are grouped by statistic: all median columns
-    (the three noise tiers plus the deterministic ideal reference) are packed on
-    the left under a single ``Median`` header, and the three interquartile-range
-    columns on the right under ``IQR``.  Median cells are tinted with a warm
-    colour map and IQR cells with a cool one, so the reader can tell an "error
-    level" from a "scatter level" at a glance.
+    result tables.  Inside every row group the columns are grouped by statistic:
+    all median columns (the three noise tiers plus the deterministic ideal
+    reference) are packed together under one ``Median`` header, and the three
+    interquartile-range columns under ``IQR``.  Median cells are tinted with a
+    warm colour map and IQR cells with a cool one, so the reader can tell an
+    "error level" from a "scatter level" at a glance.
+
+    ``blocks`` optionally splits the columns into side-by-side groups so that
+    several cases share one table.  It is a sequence of ``(key, label)`` pairs
+    that each contribute their own ``Median``/``IQR`` column groups under a
+    shared header row, and the row-group data is then keyed by block::
+
+        {key: {method: {tier: {"median": 16.0, "iqr": 3.5}, ...}, ...}, ...}
+
+    With ``blocks=None`` (the default) the data stays the flat
+    ``{method: {tier: {...}}}`` mapping and no block header row is drawn.
 
     ``row_groups`` is a list of dicts, one per metric block::
 
@@ -596,33 +671,45 @@ def plot_summary_heatmap(row_groups, save_path=None,
     Colour scaling is applied once per metric row group and per statistic: all
     median cells of a block (the three noise tiers *and* the ideal reference)
     share one warm scale, and all IQR cells of the block share one cool scale.
-    Values are mapped through :math:`\\log_{10}` so that a larger value is
-    darker.  The smallest value in each column is also bolded (matching the old
-    tables); colour and bold therefore encode complementary information, and the
-    numbers remain legible without colour.  The colour maps are truncated to
-    ``median_range`` / ``iqr_range`` (fractions of the full map) so their lightest
-    end is a mid tone rather than white, which keeps the white value text
-    readable on every cell; all non-data cells stay white with black text.  Two
-    legend colour bars for the Median (warm) and IQR (cool) scales are drawn
-    below the table.
+    Every column block of that row group reuses the same pair of scales, so the
+    blocks stay directly comparable by shade instead of each being renormalised
+    on its own range.  Values are mapped through :math:`\\log_{10}` so that a
+    larger value is darker.  The smallest value in each column is also bolded
+    (matching the old tables); colour and bold therefore encode complementary
+    information, and the numbers remain legible without colour.  The colour maps
+    are truncated to ``median_range`` / ``iqr_range`` (fractions of the full map)
+    so their lightest end is a mid tone rather than white, which keeps the white
+    value text readable on every cell; all non-data cells stay white with black
+    text.  Two legend colour bars for the Median (warm) and IQR (cool) scales
+    are drawn below the table.
+
+    Cells are sized to stay legible at the width of a journal column: values are
+    printed with ``decimals`` places and every data column is ``data_col_width``
+    inches wide.  The vertical rules are interrupted at every full-width cell
+    (the block header and the metric labels) so no line cuts through a spanning
+    label.
     """
     if median_range is None:
         median_range = _HEATMAP_MEDIAN_RANGE
     if iqr_range is None:
         iqr_range = _HEATMAP_IQR_RANGE
-    tiers = _HEATMAP_TIERS
+    block_list = list(blocks) if blocks else [(None, None)]
     has_ideal = any(
         "ideal" in mdata
         for group in row_groups
-        for mdata in group["data"].values()
+        for block_data in (group["data"].values() if blocks else (group["data"],))
+        for mdata in block_data.values()
     )
 
-    # Median block on the left (tiers + ideal), IQR block on the right.
-    median_cols = [(tier, "median") for tier in tiers]
-    if has_ideal:
-        median_cols.append(("ideal", "median"))
-    iqr_cols = [(tier, "iqr") for tier in tiers]
-    data_cols = median_cols + iqr_cols
+    # Per block: the Median group (tiers + ideal) first, the IQR group second.
+    median_tiers = list(_HEATMAP_TIERS) + (["ideal"] if has_ideal else [])
+    data_cols = [
+        (block_key, tier, stat)
+        for block_key, _ in block_list
+        for stat, stat_tiers in (("median", median_tiers),
+                                 ("iqr", list(_HEATMAP_TIERS)))
+        for tier in stat_tiers
+    ]
 
     def _truncate(cmap, lo, hi):
         base = colormaps[cmap]
@@ -640,20 +727,24 @@ def plot_summary_heatmap(row_groups, save_path=None,
         per_column = {
             column: _metric_values(group, methods, column) for column in data_cols
         }
-        # One scale per metric and per statistic (median / IQR), so a cell's
-        # shade is comparable across the tiers and the ideal reference inside the
-        # same row group rather than being renormalised in every column.
+        # One scale per metric and per statistic (median / IQR), shared by every
+        # column block, so a cell's shade is comparable across the tiers, the
+        # ideal reference and the blocks inside the same row group rather than
+        # being renormalised in every column.
         scales = {}
-        for stat, columns in (("median", median_cols), ("iqr", iqr_cols)):
-            values = [v for column in columns for v in per_column[column]]
+        for stat in ("median", "iqr"):
+            values = [
+                v for column in data_cols if column[2] == stat
+                for v in per_column[column]
+            ]
             scales[stat] = (min(values), max(values)) if values else (None, None)
 
         cells = {}
         for method in methods:
             cells[method] = {}
             for column in data_cols:
-                tier, stat = column
-                raw = group["data"].get(method, {}).get(tier, {}).get(stat)
+                block_key, tier, stat = column
+                raw = _block_data(group, block_key).get(method, {}).get(tier, {}).get(stat)
                 lo, hi = scales[stat]
                 if raw is None or not np.isfinite(float(raw)) or lo is None:
                     cells[method][column] = ("--", "white", False, False)
@@ -669,11 +760,15 @@ def plot_summary_heatmap(row_groups, save_path=None,
                 facecolor = cmap(float(np.clip(pos, 0.0, 1.0)))
                 column_values = per_column[column]
                 best = bool(column_values) and value == min(column_values)
-                cells[method][column] = (_summary_fmt(value), facecolor, True, best)
+                cells[method][column] = (
+                    _summary_fmt(value, decimals), facecolor, True, best
+                )
         groups.append({"label": group["label"], "methods": methods, "cells": cells})
 
     n_body = sum(1 + len(group["methods"]) for group in groups)
-    n_rows = 2 + n_body
+    # Header levels: the optional block row, the statistic row and the tier row.
+    n_header = 3 if blocks else 2
+    n_rows = n_header + n_body
 
     x_edges = [0.0, method_col_width]
     for _ in data_cols:
@@ -692,34 +787,57 @@ def plot_summary_heatmap(row_groups, save_path=None,
                       edgecolor=edgecolor, linewidth=linewidth)
         )
 
-    # Two-row header: the statistic name ("Median" / "IQR") spans its block of
-    # columns, then each sub-column is labelled by tier (or "Ideal").  The method
-    # column spans both header rows.  Header / method / label cells stay white
-    # with black text; only the coloured data cells use white text.
-    cell(0.0, 0.0, method_col_width, 2.0, "white")
-    ax.text(method_col_width / 2.0, 1.0, "Method", ha="center", va="center",
-            fontsize=fontsize + 1, fontweight="bold", color=_HEATMAP_LABEL_COLOR)
-
-    n_median = len(median_cols)
-    for label, j0, j1 in (("Median", 0, n_median), ("IQR", n_median, len(data_cols))):
-        x0, x1 = x_edges[1 + j0], x_edges[1 + j1]
-        cell(x0, 0.0, x1 - x0, 1.0, "white")
-        ax.text((x0 + x1) / 2.0, 0.5, label, ha="center", va="center",
+    # Header: the method column spans every header row, then each column block
+    # contributes a block header (only when ``blocks`` is used), a statistic
+    # header ("Median" / "IQR") and one tier label per column.  Header / method /
+    # label cells stay white with black text; only the coloured data cells use
+    # white text.
+    def _span_header(block_key, stat, row: float, label: str) -> None:
+        """Draw one white header cell spanning the columns it labels."""
+        idx = [
+            j for j, column in enumerate(data_cols)
+            if column[0] == block_key and (stat is None or column[2] == stat)
+        ]
+        if not idx:
+            return
+        x0, x1 = x_edges[1 + idx[0]], x_edges[1 + idx[-1] + 1]
+        cell(x0, row, x1 - x0, 1.0, "white")
+        ax.text((x0 + x1) / 2.0, row + 0.5, label, ha="center", va="center",
                 fontsize=fontsize + 1, fontweight="bold", color=_HEATMAP_LABEL_COLOR)
 
-    for j, column in enumerate(data_cols):
-        tier = column[0]
-        x0 = x_edges[1 + j]
-        cell(x0, 1.0, data_col_width, 1.0, "white")
-        label = "Ideal" if tier == "ideal" else _HEATMAP_TIER_LABELS[tier]
-        ax.text(x0 + data_col_width / 2.0, 1.5, label, ha="center", va="center",
-                fontsize=fontsize, color=_HEATMAP_LABEL_COLOR)
+    cell(0.0, 0.0, method_col_width, float(n_header), "white")
+    ax.text(method_col_width / 2.0, n_header / 2.0, "Method", ha="center", va="center",
+            fontsize=fontsize + 1, fontweight="bold", color=_HEATMAP_LABEL_COLOR)
 
-    row = 2
+    stat_row = 1.0 if blocks else 0.0
+    tier_row = stat_row + 1.0
+    # The tier row carries the longest words ("Reduced") in the narrowest cells,
+    # so it gets a slightly smaller face than the data.
+    tier_fontsize = fontsize - 1.5
+    for block_key, block_label in block_list:
+        if blocks:
+            _span_header(block_key, None, 0.0, block_label)
+        _span_header(block_key, "median", stat_row, "Median")
+        _span_header(block_key, "iqr", stat_row, "IQR")
+        for j, column in enumerate(data_cols):
+            if column[0] != block_key:
+                continue
+            x0 = x_edges[1 + j]
+            cell(x0, tier_row, data_col_width, 1.0, "white")
+            label = "Ideal" if column[1] == "ideal" else _HEATMAP_TIER_LABELS[column[1]]
+            ax.text(x0 + data_col_width / 2.0, tier_row + 0.5, label, ha="center",
+                    va="center", fontsize=tier_fontsize, color=_HEATMAP_LABEL_COLOR)
+
+    # Body: every group contributes a full-width label row followed by one row
+    # per method.  The label rows are remembered so the vertical rules can stop
+    # at them.
+    row = n_header
+    full_width_rows = [0] if blocks else []
     for group in groups:
         cell(0.0, row, total_width, 1.0, "white")
         ax.text(0.08, row + 0.5, group["label"], ha="left", va="center",
                 fontsize=fontsize + 1, fontweight="bold", color=_HEATMAP_LABEL_COLOR)
+        full_width_rows.append(row)
         row += 1
         for method in group["methods"]:
             cell(0.0, row, method_col_width, 1.0, "white")
@@ -735,10 +853,29 @@ def plot_summary_heatmap(row_groups, save_path=None,
                         fontweight="bold" if bold else "normal")
             row += 1
 
-    # Divider between the Median and IQR blocks.
-    sep_x = x_edges[1 + n_median]
-    ax.plot([sep_x, sep_x], [0.0, n_rows], color=_HEATMAP_EDGE_COLOR, linewidth=1.4,
-            zorder=5)
+    # Divider between the Median and IQR groups of every block, plus a heavier
+    # separator between the column blocks themselves.  Both are drawn as
+    # interrupted rules: they skip the full-width cells so that no line crosses
+    # the scenario header or a metric label.
+    def _rule(x: float, linewidth: float) -> None:
+        """Vertical rule ``x``, broken at every full-width row."""
+        spans, start = [], 0
+        for skip in sorted({*full_width_rows, n_rows}):
+            if skip > start:
+                spans.append((start, skip))
+            start = skip + 1
+        for y0, y1 in spans:
+            ax.plot([x, x], [y0, y1], color=_HEATMAP_EDGE_COLOR,
+                    linewidth=linewidth, zorder=5)
+
+    for k, (block_key, _) in enumerate(block_list):
+        idx = [j for j, column in enumerate(data_cols) if column[0] == block_key]
+        if not idx:
+            continue
+        if k:
+            _rule(x_edges[1 + idx[0]], 2.0)
+        n_median_cols = sum(1 for j in idx if data_cols[j][2] == "median")
+        _rule(x_edges[1 + idx[0] + n_median_cols], 1.4)
 
     fig.subplots_adjust(left=0.01, right=0.99, top=0.995, bottom=0.075)
 
