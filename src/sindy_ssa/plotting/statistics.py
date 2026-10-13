@@ -270,7 +270,7 @@ _TIER_LABELS = {"high": "High", "low": "Low"}
 _HALF_WIDTH = 0.42
 
 
-def _draw_box(ax, samples, pos: float, color, width: float) -> None:
+def _draw_box(ax, samples, pos: float, color, width: float, hatch=None) -> None:
     """Draw a boxplot (1.5x IQR whiskers, fliers shown) centred at ``pos``."""
     parts = ax.boxplot(
         [samples], positions=[pos], widths=width, patch_artist=True,
@@ -280,6 +280,8 @@ def _draw_box(ax, samples, pos: float, color, width: float) -> None:
         patch.set_facecolor(color)
         patch.set_edgecolor("k")
         patch.set_alpha(0.7)
+        if hatch:
+            patch.set_hatch(hatch)
     for median in parts["medians"]:
         median.set_color("k")
     for flier in parts["fliers"]:
@@ -289,7 +291,8 @@ def _draw_box(ax, samples, pos: float, color, width: float) -> None:
         )
 
 
-def _draw_half_violin(ax, samples, pos: float, color, width: float) -> None:
+def _draw_half_violin(ax, samples, pos: float, color, width: float,
+                      hatch=None) -> None:
     """Draw only the left half of a KDE violin anchored at ``pos``."""
     values = np.asarray(samples, dtype=float)
     lo, hi = float(values.min()), float(values.max())
@@ -304,36 +307,40 @@ def _draw_half_violin(ax, samples, pos: float, color, width: float) -> None:
     ax.fill_betweenx(
         y, pos - width * density, pos,
         facecolor=color, edgecolor="k", linewidth=0.8, alpha=0.7, zorder=2,
+        hatch=hatch,
     )
 
 
-def _draw_half(ax, samples, pos: float, color) -> None:
+def _draw_half(ax, samples, pos: float, color, width: float = _HALF_WIDTH,
+               hatch=None) -> None:
     """Draw the split glyph at ``pos``: violin density left, box+fliers right."""
-    _draw_half_violin(ax, samples, pos, color, _HALF_WIDTH)
-    _draw_box(ax, samples, pos + _HALF_WIDTH / 2.0, color, _HALF_WIDTH)
+    _draw_half_violin(ax, samples, pos, color, width, hatch=hatch)
+    _draw_box(ax, samples, pos + width / 2.0, color, width, hatch=hatch)
 
 
 def plot_metric_tiers(case_data, noise_cases,
                       save_path=None, log_scale=True, show=False, png=True):
-    """Tier-separated batch overview: a 4xN grid of metric panels.
+    """Tier-separated batch overview: a 2xN grid of metric panels.
 
-    Rows are the four metric variants---:math:`\\mathcal{EPE}_{3D}`,
-    :math:`\\mathcal{EPE}_{2D}`, :math:`\\mathcal{EI}_{3D}` and
-    :math:`\\mathcal{EI}_{2D}`---and columns the noise tiers (typically High /
-    Low / Reduced).  Every panel therefore gets its own y-axis, which keeps the
-    widely different tier magnitudes readable.  Within a panel the methods sit
-    side by side and are told apart by their shared colours, each drawn as a
-    split glyph---the left half is the KDE violin and the right half a boxplot
-    with the outlying runs shown as fliers.  The method legend is drawn once on
-    the right.  ``log_scale`` selects a logarithmic y-axis and ``png`` also
-    writes a raster preview next to the PDF.
+    Rows are the two error metrics---:math:`\\mathcal{EPE}` on top and
+    :math:`\\mathcal{EI}` below---and columns the noise tiers (typically High
+    / Low).  Every panel therefore gets its own y-axis, which keeps the widely
+    different tier magnitudes readable.  Within a panel the methods sit side by
+    side and are told apart by their shared colours, each drawn as a *pair* of
+    split glyphs---the left half of a glyph is the KDE violin and the right
+    half a boxplot with the outlying runs shown as fliers.  The solid glyph is
+    the full 3D metric and the hatched glyph its planar 2D variant; the texture
+    key is added to the method legend, which is drawn once on the right.
+    ``log_scale`` selects a logarithmic y-axis and ``png`` also writes a raster
+    preview next to the PDF.
     """
-    panels = [
-        (r"$\mathcal{EPE}_{\mathrm{3D}}$ (km)", "epe"),
-        (r"$\mathcal{EPE}_{\mathrm{2D}}$ (km)", "epe_planar"),
-        (r"$\mathcal{EI}_{\mathrm{3D}}$ (m/s)", "ei_total"),
-        (r"$\mathcal{EI}_{\mathrm{2D}}$ (m/s)", "ei_planar"),
+    # Row groups: (y-axis label, 3D column, planar 2D column).
+    rows = [
+        (r"$\mathcal{EPE}$ (km)", "epe", "epe_planar"),
+        (r"$\mathcal{EI}$ (m/s)", "ei_total", "ei_planar"),
     ]
+    # (legend label, hatch) telling the two metric variants of a row apart.
+    variants = (("3D", None), ("2D", "////"))
     noise_cases = [c for c in noise_cases if c in case_data]
     if not noise_cases:
         return save_path
@@ -342,27 +349,35 @@ def plot_metric_tiers(case_data, noise_cases,
     n = len(methods)
     n_tiers = len(noise_cases)
     colors = [METHOD_COLORS.get(m, _COLORS[i % len(_COLORS)]) for i, m in enumerate(methods)]
-    x = np.arange(n)
+    # Two glyphs per method, so the method groups are spaced twice as wide and
+    # the glyphs themselves are narrowed to leave a gap between the groups.
+    x = np.arange(n) * 2.0
+    half = 0.34
+    offsets = (-(half + 0.08), half + 0.08)
 
     fig, axes = plt.subplots(
-        len(panels), n_tiers, figsize=(4.4 * n_tiers, 12.0),
+        len(rows), n_tiers, figsize=(6.4 * n_tiers, 8.6),
         squeeze=False, sharex=False, sharey=False,
     )
-    for r, (title, col) in enumerate(panels):
+    for r, (title, col_3d, col_2d) in enumerate(rows):
         for c, case in enumerate(noise_cases):
             ax = axes[r][c]
             df = case_data[case]
             for i, method in enumerate(methods):
-                samples = pd.to_numeric(
-                    df.loc[df["method"].astype(str) == method, col], errors="coerce"
-                ).dropna().values
-                if samples.size == 0:
-                    continue
-                _draw_half(ax, samples, x[i], colors[i])
+                for (col, hatch), offset in zip(
+                    ((col_3d, variants[0][1]), (col_2d, variants[1][1])), offsets
+                ):
+                    samples = pd.to_numeric(
+                        df.loc[df["method"].astype(str) == method, col], errors="coerce"
+                    ).dropna().values
+                    if samples.size == 0:
+                        continue
+                    _draw_half(ax, samples, x[i] + offset, colors[i],
+                               width=half, hatch=hatch)
 
             ax.set_xticks(x)
             ax.set_xticklabels([])
-            ax.set_xlim(-0.7, n - 0.3)
+            ax.set_xlim(x[0] - 1.1, x[-1] + 1.1)
             ax.grid(True, axis="y", alpha=0.3)
             ax.tick_params(axis="y", labelsize=FONT_SIZE - 2)
             if log_scale:
@@ -377,8 +392,14 @@ def plot_metric_tiers(case_data, noise_cases,
         Patch(facecolor=colors[i], edgecolor="k", alpha=0.7, label=methods[i])
         for i in range(n)
     ]
+    # Texture key telling the solid (3D) and hatched (2D) glyphs apart.
+    variant_proxies = [
+        Patch(facecolor="lightgray", edgecolor="k", alpha=0.7, hatch=hatch,
+              label=label)
+        for label, hatch in variants
+    ]
     fig.legend(
-        handles=method_proxies,
+        handles=method_proxies + variant_proxies,
         loc="center left", bbox_to_anchor=(1.0, 0.5), borderaxespad=0.0,
         fontsize=LEGEND_FONT_SIZE + 2,
     )

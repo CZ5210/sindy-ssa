@@ -15,6 +15,13 @@
 #     sindy-ssa batch run --data-root data/_pilot --figures-root results/_pilot
 #     sindy-ssa batch run --config configs/config.yaml   # use the main config
 #
+# The manuscript's *whole* campaign (every observed window, every case, all
+# archived) is one command:
+#
+#     sindy-ssa batch paper                 # full + window70 + window30, then the figures
+#     sindy-ssa batch paper --runs 100 --with-intermediates
+#     sindy-ssa batch paper --windows full window30
+#
 # To change the underlying scenario/noise/SINDy settings, edit ``config.yaml``;
 # do not repeat them here.
 
@@ -40,8 +47,30 @@ batch:
     # 0.70 (see ``plot_batch_tiers.py``).  This default is the 70 % window; set
     # it to 0.30 to produce the other one, archiving the two runs under
     # ``batch_archive/window30/`` and ``batch_archive/window70/``.
+    #
+    # ``sindy-ssa batch paper`` drives ``enabled``/``fit_fraction`` itself from
+    # the window it is running (see ``batch.paper.windows`` below), so the plain
+    # ``batch run`` keeps using exactly the values set here.
     fit_fraction: 0.70
     # MEE grid of the two state-based methods (SINDy / SINDy-UMEE):
     # reference (non-thrusting orbit) | propagated (self-consistent re-propagation
     # of the identified thrust; see config.yaml).
     future_state: propagated
+
+  # ``sindy-ssa batch paper``: the paper's whole Monte-Carlo campaign in one
+  # command.  Each window is replayed on the same batch settings above and
+  # archived as ``<archive_root>/<window>/<scenario>/<case>/``, i.e. the layout
+  # read by ``plot_batch_tiers.py``.
+  paper:
+    # Window directories, in run order.  ``full`` = fully observed (no
+    # prediction), ``windowNN`` = identification on the first NN % of the arc.
+    windows: [full, window70, window30]
+    archive_root: batch_archive
+    # Also copy the per-run methods/ and observation/ trees into the archive
+    # (much larger; the figures only need the evaluation tables).
+    copy_intermediates: false
+    # Regenerate the archive figures once every window is archived.
+    figures: true
+    figures_dir: ""             # empty -> <archive_root>/figs
+    figures_log_scale: false
+    figures_png: false

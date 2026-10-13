@@ -54,3 +54,45 @@ METHODS: dict[str, str] = {
 
 DEFAULT_BATCH_RUNS: int = 100
 DEFAULT_SEED0: int = 0
+
+# --------------------------------------------------------------------------- #
+# paper batch campaign
+# --------------------------------------------------------------------------- #
+# The manuscript's batch figures need three campaigns of the same Monte-Carlo
+# study: the fully observed manoeuvre plus two partial-window forecasts.  A
+# window directory name maps to the observed fraction of the manoeuvre arc used
+# for identification (``None`` -> fully observed, prediction disabled).
+PAPER_WINDOWS: tuple[tuple[str, float | None], ...] = (
+    ("full", None),
+    ("window70", 0.70),
+    ("window30", 0.30),
+)
+
+# Root of the archived Monte-Carlo results consumed by ``plot_batch_tiers.py``
+# and produced by ``sindy-ssa batch paper``.
+DEFAULT_ARCHIVE_ROOT: str = "batch_archive"
+
+
+def paper_window(name: str) -> tuple[str, float | None]:
+    """Validate a paper-window directory name and return ``(name, fit_fraction)``.
+
+    Accepted names follow the archive layout: ``full`` for the fully observed
+    manoeuvre and ``windowNN`` for a partial window observed over the first
+    ``NN`` percent of the arc (e.g. ``window70`` -> 0.70).
+    """
+    for window, fraction in PAPER_WINDOWS:
+        if name == window:
+            return window, fraction
+    if name.startswith("window") and name[6:].isdigit():
+        percent = int(name[6:])
+        if 0 < percent < 100:
+            return name, percent / 100.0
+    raise ValueError(
+        f"unknown paper window {name!r}; expected 'full' or 'windowNN' "
+        f"(e.g. window70), or one of {[w for w, _ in PAPER_WINDOWS]}"
+    )
+
+
+def paper_window_prefix(name: str) -> str:
+    """Figure filename prefix of a window (``full`` -> ``''``, ``window70`` -> ``'70'``)."""
+    return "" if name == "full" else name[len("window"):]

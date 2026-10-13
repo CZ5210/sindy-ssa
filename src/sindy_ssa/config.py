@@ -190,6 +190,40 @@ class SindyConfig:
 
 
 @dataclass
+class PaperBatchConfig:
+    """Paper batch campaign: one command for every observed window.
+
+    论文批量试验：一条命令跑完全部观测窗口。
+
+    ``sindy-ssa batch paper`` replays the Monte-Carlo study once per entry of
+    ``windows`` (``full`` = fully observed, ``windowNN`` = identification on the
+    first ``NN`` percent of the manoeuvre arc) and archives every
+    ``batch_evaluation.csv`` under ``<archive_root>/<window>/<scenario>/<case>/``,
+    i.e. exactly the layout read by ``plot_batch_tiers.py``.  The window name
+    carries the observed fraction, so only the *list* of windows is configured
+    here; ``sindy.prediction`` / ``batch.prediction`` still supply the
+    ``future_state`` and the fallback ``fit_fraction``.
+    """
+
+    # Archive window directories, in run order.
+    windows: list = field(default_factory=lambda: ["full", "window70", "window30"])
+    # Root of the archived results (also the default input of plot_batch_tiers.py).
+    archive_root: str = "batch_archive"
+    # Also archive the per-run ``methods/`` and ``observation/`` trees next to
+    # the evaluation CSVs.  Off by default: the figures only need the CSVs and
+    # the intermediates are orders of magnitude larger.
+    copy_intermediates: bool = False
+    # Regenerate the paper's archive figures once every window has been archived.
+    figures: bool = True
+    # Figure output directory; empty -> ``<archive_root>/figs``.
+    figures_dir: str = ""
+    # Logarithmic y-axis on the tier and convergence charts (linear by default).
+    figures_log_scale: bool = False
+    # Also write a PNG preview next to each PDF.
+    figures_png: bool = False
+
+
+@dataclass
 class BatchConfig:
     """Monte-Carlo batch study settings.
 
@@ -207,6 +241,8 @@ class BatchConfig:
     prediction: PredictionConfig | None = None
     # Cross-noise overview: use a log y-axis (per panel) instead of linear.
     overview_log: bool = True
+    # ``sindy-ssa batch paper`` settings (all windows of the paper campaign).
+    paper: PaperBatchConfig = field(default_factory=PaperBatchConfig)
 
 
 @dataclass
@@ -297,6 +333,9 @@ class AppConfig:
             PredictionConfig(**scalars(PredictionConfig, batch["prediction"]))
             if "prediction" in batch
             else None
+        )
+        batch_kwargs["paper"] = PaperBatchConfig(
+            **scalars(PaperBatchConfig, batch.get("paper", {}))
         )
 
         return cls(

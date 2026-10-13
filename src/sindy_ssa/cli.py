@@ -21,6 +21,7 @@ import os
 from .config import AppConfig, NoiseConfig, load_config, scenario_names
 from .experiments import (
     evaluate_existing,
+    make_archive_figures,
     make_result_figures,
     plot_batch_figures,
     plot_batch_overview,
@@ -28,6 +29,7 @@ from .experiments import (
     plot_scenario_truth,
     run_batch,
     run_dynamics,
+    run_paper_batch,
     run_reconstruction,
 )
 from .registry import (
@@ -35,6 +37,7 @@ from .registry import (
     BATCH_IDEAL_CASE,
     DEFAULT_BATCH_CONFIG,
     DEFAULT_CONFIG,
+    PAPER_WINDOWS,
     TYPICAL_CASES,
 )
 from .studies import ballistic, noise
@@ -220,6 +223,43 @@ def cmd_batch_plot(args) -> int:
     return 0
 
 
+def cmd_batch_paper(args) -> int:
+    """Run the whole paper campaign: every window, every case, then the figures."""
+    scenarios = _iter_scenarios(args)
+    # Campaign settings (windows, archive root, figures) are shared by the
+    # scenarios, so the first config supplies the defaults for CLI flags.
+    ref_cfg = load_config(scenarios[0][1], scenario=scenarios[0][0])
+    paper = ref_cfg.batch.paper
+    archive_root = args.archive or paper.archive_root
+    cases = None if args.case is None else [args.case]
+
+    archived: list[str] = []
+    for scenario, cfg_path in scenarios:
+        cfg = load_config(cfg_path, scenario=scenario)
+        _set_roots(cfg, args)
+        archived += run_paper_batch(
+            cfg,
+            runs=args.runs,
+            seed0=args.seed0,
+            windows=args.windows,
+            cases=cases,
+            archive_root=archive_root,
+            copy_intermediates=args.with_intermediates,
+        )
+
+    print(f"\narchived {len(archived)} evaluation table(s) under {archive_root}")
+    run_figures = args.figures if args.figures is not None else paper.figures
+    if run_figures:
+        make_archive_figures(
+            ref_cfg,
+            archive_root=archive_root,
+            out_dir=args.figures_out or None,
+            log_scale=args.log_scale,
+            png=args.png,
+        )
+    return 0
+
+
 # --------------------------------------------------------------------------- #
 # noise (independent study)
 # --------------------------------------------------------------------------- #
@@ -311,9 +351,41 @@ def build_parser() -> argparse.ArgumentParser:
     p_batch_plot = batch_sub.add_parser("plot", help="plot batch boxplots")
     _add_common(p_batch_plot)
     _add_case(p_batch_plot)
+    p_batch_paper = batch_sub.add_parser(
+        "paper",
+        help="run every paper window (full/window70/window30) and archive it",
+        description=(
+            "Run the manuscript's whole Monte-Carlo campaign: every observed "
+            "window (full/window70/window30) and every case (ideal/high/low) of "
+            "both scenarios, archiving the results as "
+            "batch_archive/<window>/<scenario>/<case>/, then regenerate the "
+            "paper's batch figures from that archive."
+        ),
+    )
+    _add_common(p_batch_paper)
+    _add_case(p_batch_paper)
+    p_batch_paper.add_argument("--runs", type=int, default=None, help="number of Monte-Carlo runs per noisy case (default: batch.runs in the config)")
+    p_batch_paper.add_argument("--seed0", type=int, default=None, help="base seed (default: batch.seed0 in the config)")
+    p_batch_paper.add_argument(
+        "--windows", nargs="+", default=None, metavar="WINDOW",
+        help=f"subset of windows to run (default: batch.paper.windows, i.e. {' '.join(w for w, _ in PAPER_WINDOWS)})",
+    )
+    p_batch_paper.add_argument("--archive", default=None, help="archive root (default: batch.paper.archive_root)")
+    p_batch_paper.add_argument(
+        "--with-intermediates", action=argparse.BooleanOptionalAction, default=None,
+        help="also archive methods/ and observation/ (default: batch.paper.copy_intermediates)",
+    )
+    p_batch_paper.add_argument(
+        "--figures", action=argparse.BooleanOptionalAction, default=None,
+        help="regenerate the archive figures when the campaign is done (default: batch.paper.figures)",
+    )
+    p_batch_paper.add_argument("--figures-out", default=None, help="figure directory (default: <archive>/figs)")
+    p_batch_paper.add_argument("--log-scale", action=argparse.BooleanOptionalAction, default=None, help="logarithmic y-axis on the tier/convergence charts")
+    p_batch_paper.add_argument("--png", action=argparse.BooleanOptionalAction, default=None, help="also write PNG previews of the figures")
     # Default to the dedicated batch config so prediction stays off there.
     p_batch_run.set_defaults(func=cmd_batch_run, config=DEFAULT_BATCH_CONFIG)
     p_batch_plot.set_defaults(func=cmd_batch_plot, config=DEFAULT_BATCH_CONFIG)
+    p_batch_paper.set_defaults(func=cmd_batch_paper, config=DEFAULT_BATCH_CONFIG)
 
     # noise
     noise_p = sub.add_parser("noise", help="RTN noise calibration")

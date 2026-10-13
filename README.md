@@ -163,6 +163,10 @@ sindy-ssa sindy plot
 sindy-ssa batch run
 sindy-ssa batch plot
 
+# ...or the manuscript's whole campaign (full + window70 + window30) plus its
+# archived figures, in one command (§8.4)
+sindy-ssa batch paper
+
 # 4) drag-coefficient (Cd) uncertainty study — prints to the console only
 sindy-ssa ballistic run
 
@@ -171,7 +175,8 @@ python plot_batch_tiers.py --archive batch_archive --out results/paper
 ```
 
 **中文。** 依次执行：噪声标定与真值动力学 → 四种典型工况重建 → 100 次蒙特卡洛批处理 →
-弹道系数不确定性研究（仅控制台输出）→ 由 `batch_archive/` 重建论文批量图。
+弹道系数不确定性研究（仅控制台输出）→ 由 `batch_archive/` 重建论文批量图。论文的三个观测窗口
+可用一条 `sindy-ssa batch paper` 跑完并自动归档（见 §8.4）。
 
 ---
 
@@ -284,6 +289,34 @@ sindy-ssa batch run --runs 5 --case high --data-root data/_pilot --figures-root 
 Output: `data/<scenario>/batch/<case>/batch_evaluation.csv` (long table with a
 `run` column), `batch_summary.csv` (median + IQR); `results/<scenario>/batch/*.{pdf,png}`.
 
+**The paper's whole campaign in one command.** `sindy-ssa batch paper` replays
+the batch study once per observed window — fully observed plus the two
+partial-window forecasts — and archives every case as
+`batch_archive/<window>/<scenario>/<case>/`, i.e. the layout that
+`plot_batch_tiers.py` reads.  It finishes by regenerating the paper's archive
+figures from that archive.
+
+```bash
+sindy-ssa batch paper                                   # full + window70 + window30, then the figures
+sindy-ssa batch paper --runs 100                        # explicit realisation count
+sindy-ssa batch paper --windows full window30           # a subset of windows
+sindy-ssa batch paper --with-intermediates              # also archive methods/ and observation/
+sindy-ssa batch paper --no-figures                      # archive only, no figures
+sindy-ssa batch paper --runs 5 --archive data/_trial    # cheap end-to-end trial run
+```
+
+Windows, archive root, whether intermediates are copied and whether figures are
+rendered all come from the `batch.paper:` block of `configs/batch_run.yaml`; the
+flags above override it.  The window name carries the observed fraction
+(`full` = no prediction, `windowNN` = identification on the first `NN` % of the
+arc), so `sindy.prediction.future_state` / `batch.prediction` keep supplying the
+`future_state` and the fallback `fit_fraction`.  Results are archived as soon as
+each case finishes, so an interrupted campaign still leaves a complete archive
+for every finished case.  **中文。** `sindy-ssa batch paper` 一条命令按观测窗口
+（全观测 + 两个部分窗口）重跑批量并归档到 `batch_archive/<window>/<scenario>/<case>/`，
+最后自动重建论文批量图；窗口列表、归档根目录等由 `configs/batch_run.yaml` 的
+`batch.paper:` 段控制，命令行参数可覆盖。
+
 ### 8.5 Noise calibration / 噪声标定
 
 ```bash
@@ -329,15 +362,12 @@ sindy-ssa sindy run                 # ideal / high / low, six methods
 sindy-ssa evaluate
 sindy-ssa sindy plot
 
-# 100-realisation Monte-Carlo campaign (full window)
-sindy-ssa batch run --runs 100
-sindy-ssa batch plot
+# 100-realisation Monte-Carlo campaign: every observed window
+# (full / window70 / window30), archived under batch_archive/, plus the
+# archived batch figures (batch_tiers / vs_window / summary heatmaps)
+sindy-ssa batch paper --runs 100 --figures-out results/paper
 
-# Partial-window prediction: with sindy.prediction.enabled: true in batch_run.yaml,
-# run "sindy-ssa batch run --runs 100" once per observed fraction (0.70 and 0.30),
-# archiving the outputs under batch_archive/window70/ and batch_archive/window30/.
-
-# Archived batch figures (batch_tiers / vs_window / summary heatmaps)
+# Re-render the figures only (no re-run)
 python plot_batch_tiers.py --archive batch_archive --out results/paper
 ```
 
@@ -346,6 +376,8 @@ The archived 100-realisation results of the manuscript are shipped in
 campaign.
 
 论文使用的 100 次蒙特卡洛结果已随仓库提供（`batch_archive/`），无需重跑即可复现批量图。
+若需按新代码重跑，`sindy-ssa batch paper --runs 100` 会依次完成全观测、70 % 与 30 %
+三个窗口的全部工况，归档到 `batch_archive/` 后直接生成批量图。
 
 ---
 
