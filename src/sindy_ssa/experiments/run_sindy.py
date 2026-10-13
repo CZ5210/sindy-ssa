@@ -105,8 +105,9 @@ _THRUST_COMPONENTS = ("u_r", "u_t", "u_n")
 # ``propagated`` sweep settings.  Internal constants (not user-facing): the
 # sequence is under-relaxed so it stays monotone and cannot run away if the loop
 # gain is high, and the sweep count is where the marginal EI improvement no longer
-# justifies the extra model evaluations.  Measured on stationkeeping/ideal (EI in
-# m/s, actuator limit 2.125e-7 km/s^2): ``reference`` grid 18.2 (42 % clipped),
+# justifies the extra model evaluations.  Measured on a station-keeping
+# reconstruction (EI in m/s, actuator limit 2.125e-7 km/s^2): ``reference``
+# grid 18.2 (42 % clipped),
 # 1 sweep 6.7, 3 sweeps 6.6, 8 sweeps 6.0 (21 % clipped), 10 sweeps 5.8.
 _PROPAGATED_SWEEPS = 3
 _PROPAGATED_RELAXATION = 0.5

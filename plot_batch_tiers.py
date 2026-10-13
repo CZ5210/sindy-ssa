@@ -4,9 +4,9 @@ The Monte-Carlo results live under::
 
     batch_archive/<window>/<scenario>/<tier>/batch_evaluation.csv
 
-where ``<window>`` is one of ``full``/``window25``/``window50``/``window75``,
+where ``<window>`` is one of ``full``/``window30``/``window70``,
 ``<scenario>`` is ``evasive``/``stationkeeping`` and ``<tier>`` is
-``high``/``low``/``reduced``.  This script reads those long-format evaluation
+``ideal``/``high``/``low``.  This script reads those long-format evaluation
 tables directly (no config or CLI needed) and renders:
 
 * the ``batch_tiers`` figure---a 4xN grid with one row per EPE/EI variant (3D
@@ -15,7 +15,7 @@ tables directly (no config or CLI needed) and renders:
   left half is the KDE violin and the right half a boxplot with the outlying
   runs shown as fliers;
 * the ``batch_vs_window`` convergence chart---2xN grid (planar EPE/EI rows, noise
-  tiers columns) with the observed fraction (25 / 50 / 75 / 100%) on the x-axis
+  tiers columns) with the observed fraction (30 / 70 / 100%) on the x-axis
   (the 100% point being the fully observed batch), one line per method (median
   over the MC runs) with its IQR shaded.  The two non-predictive MEEFD baselines
   exist on the fully observed arc only, so they are added at 100% as an
@@ -23,19 +23,19 @@ tables directly (no config or CLI needed) and renders:
   topped by their own marker;
 * ``batch_heatmap`` summary tables---colour-coded replacements for the hand-written
   result tables.  Both scenarios share one table, each contributing its own
-  ``Median`` and ``IQR`` column group: a median and an IQR column per noise tier,
-  with the deterministic ideal case adding a median-only column.  Median cells
-  use a warm colour map and IQR cells a cool one, scaled per metric row group so
-  the scenarios remain comparable by shade.  The full-observation table stacks
-  the four metrics as row groups, while the partial-window table stacks the
-  observed fraction (25 / 50 / 75%) times the planar 2D metric.
+  ``Median`` and ``IQR`` column group, i.e. a median and an IQR column per noise
+  tier, with the deterministic ideal case adding a median-only column.  Median
+  cells use a warm colour map and IQR cells a cool one, scaled per metric row
+  group so the scenarios remain comparable by shade.  The full-observation table
+  stacks the four metrics as row groups, while the partial-window table stacks
+  the observed fractions times the planar 2D metric.
 
 Figures are written as PDF only; ``--png`` adds a raster preview.
 
 Output names follow the convention already used in the paper:
 
 * ``batch_tiers_<scenario>.pdf``         (full manoeuvre window)
-* ``batch_tiers_<25|50|75><scenario>.pdf`` (partial-window prediction)
+* ``batch_tiers_<30|70><scenario>.pdf``     (partial-window prediction)
 * ``batch_vs_window_<scenario>.pdf``       (median/IQR convergence line chart)
 * ``batch_heatmap.pdf``                    (full-observation table, both scenarios)
 * ``batch_heatmap_windows.pdf``            (partial-window table, both scenarios)
@@ -67,16 +67,16 @@ from sindy_ssa.plotting import plot_metric_tiers, plot_metric_vs_window, plot_su
 from sindy_ssa.plotting.style import METHOD_ORDER
 
 # window directory -> filename prefix (mirrors the paper figure names).
-WINDOWS = (("full", ""), ("window25", "25"), ("window50", "50"), ("window75", "75"))
+WINDOWS = (("full", ""), ("window30", "30"), ("window70", "70"))
 # partial-window directories -> observed fraction, for the partial-window summary.
-WINDOW_FRACTIONS = (("window25", 25), ("window50", 50), ("window75", 75))
+WINDOW_FRACTIONS = (("window30", 30), ("window70", 70))
 # convergence line chart additionally includes the fully observed (100%) case.
-CONVERGENCE_WINDOWS = (("window25", 25), ("window50", 50), ("window75", 75), ("full", 100))
+CONVERGENCE_WINDOWS = (("window30", 30), ("window70", 70), ("full", 100))
 SCENARIOS = ("evasive", "stationkeeping")
 # Column blocks of the merged summary heatmaps: (scenario key, column label).
 SCENARIO_BLOCKS = (("stationkeeping", "Station-keeping"), ("evasive", "Evasive"))
 # Tier order shown in the figure (left to right within each method).
-NOISE_CASES = ("high", "low", "reduced")
+NOISE_CASES = ("high", "low")
 # Deterministic noise-free reference case, drawn as an extra column.
 IDEAL_CASE = "ideal"
 

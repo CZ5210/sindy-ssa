@@ -112,7 +112,6 @@ def plot_batch_tiers(config: AppConfig, cases) -> list[str]:
         plot_metric_tiers(
             case_data,
             noise_cases,
-            ideal_case=IDEAL_CASE if IDEAL_CASE in case_data else None,
             save_path=os.path.join(figures_dir, "batch_tiers"),
             log_scale=False,
             png=False,

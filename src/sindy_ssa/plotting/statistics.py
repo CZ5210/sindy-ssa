@@ -266,7 +266,7 @@ def plot_metric_overview(case_data, noise_cases, ideal_case=None,
     return save_path
 
 
-_TIER_LABELS = {"high": "High", "low": "Low", "reduced": "Reduced"}
+_TIER_LABELS = {"high": "High", "low": "Low"}
 _HALF_WIDTH = 0.42
 
 
@@ -313,7 +313,7 @@ def _draw_half(ax, samples, pos: float, color) -> None:
     _draw_box(ax, samples, pos + _HALF_WIDTH / 2.0, color, _HALF_WIDTH)
 
 
-def plot_metric_tiers(case_data, noise_cases, ideal_case=None,
+def plot_metric_tiers(case_data, noise_cases,
                       save_path=None, log_scale=True, show=False, png=True):
     """Tier-separated batch overview: a 4xN grid of metric panels.
 
@@ -326,8 +326,7 @@ def plot_metric_tiers(case_data, noise_cases, ideal_case=None,
     split glyph---the left half is the KDE violin and the right half a boxplot
     with the outlying runs shown as fliers.  The method legend is drawn once on
     the right.  ``log_scale`` selects a logarithmic y-axis and ``png`` also
-    writes a raster preview next to the PDF.  The deterministic ideal case is
-    intentionally not drawn (it lies far below the noisy tiers).
+    writes a raster preview next to the PDF.
     """
     panels = [
         (r"$\mathcal{EPE}_{\mathrm{3D}}$ (km)", "epe"),
@@ -433,7 +432,7 @@ def plot_metric_vs_window(case_data, windows, tiers, ideal_data=None, save_path=
     ``window -> tier -> long evaluation DataFrame``; for every (window, tier,
     method) the marker is the median over the Monte-Carlo runs and the shaded
     band the interquartile range, joined across the windows given in
-    ``windows`` (e.g. 25, 50, 75).  When ``ideal_data`` (``window -> DataFrame``)
+    ``windows`` (e.g. 30, 70).  When ``ideal_data`` (``window -> DataFrame``)
     is supplied an extra deterministic ``Ideal`` column is appended, drawn as
     single markers with no band.  Methods share the global colour palette;
     ``log_scale`` selects a logarithmic y-axis.
@@ -572,8 +571,8 @@ def summarise(data: pd.DataFrame, value: str, methods) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-_HEATMAP_TIERS = ("high", "low", "reduced")
-_HEATMAP_TIER_LABELS = {"high": "High", "low": "Low", "reduced": "Reduced"}
+_HEATMAP_TIERS = ("high", "low")
+_HEATMAP_TIER_LABELS = {"high": "High", "low": "Low"}
 # Only the coloured data cells carry white text; every other cell (method
 # names, headers, group labels) stays white with black text.  The two colour
 # maps are truncated so that even their lightest end is a mid tone (no bright
@@ -636,11 +635,11 @@ def plot_summary_heatmap(row_groups, save_path=None,
 
     Renders a table into a matplotlib figure so it can replace the hand-written
     result tables.  Inside every row group the columns are grouped by statistic:
-    all median columns (the three noise tiers plus the deterministic ideal
-    reference) are packed together under one ``Median`` header, and the three
-    interquartile-range columns under ``IQR``.  Median cells are tinted with a
-    warm colour map and IQR cells with a cool one, so the reader can tell an
-    "error level" from a "scatter level" at a glance.
+    all median columns (the noise tiers plus the deterministic ideal reference)
+    are packed together under one ``Median`` header, and the interquartile-range
+    columns under ``IQR``.  Median cells are tinted with a warm colour map and
+    IQR cells with a cool one, so the reader can tell an "error level" from a
+    "scatter level" at a glance.
 
     ``blocks`` optionally splits the columns into side-by-side groups so that
     several cases share one table.  It is a sequence of ``(key, label)`` pairs
@@ -661,7 +660,6 @@ def plot_summary_heatmap(row_groups, save_path=None,
                 method: {
                     "high":    {"median": 16.0, "iqr": 3.5},
                     "low":     {"median": 3.50, "iqr": None},
-                    "reduced": {"median": 0.397, "iqr": 0.2},
                     "ideal":   {"median": 0.0261},   # optional, no IQR
                 },
                 ...
@@ -669,8 +667,8 @@ def plot_summary_heatmap(row_groups, save_path=None,
         }
 
     Colour scaling is applied once per metric row group and per statistic: all
-    median cells of a block (the three noise tiers *and* the ideal reference)
-    share one warm scale, and all IQR cells of the block share one cool scale.
+    median cells of a block (the noise tiers *and* the ideal reference) share one
+    warm scale, and all IQR cells of the block share one cool scale.
     Every column block of that row group reuses the same pair of scales, so the
     blocks stay directly comparable by shade instead of each being renormalised
     on its own range.  Values are mapped through :math:`\\log_{10}` so that a

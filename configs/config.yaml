@@ -16,15 +16,11 @@ observation:
   sampling_rate: 6                 # down-sampling of the truth ephemeris
   noise:                           # one entry per typical case; keys become case names
     ideal:
-      mode: none                   # noise-free ideal reconstruction
-      seed: 0
-    reduced:
-      mode: gaussian               # gaussian (MEE-space injection)
-      tier: reduced                # low | high | reduced (Table tab:MEE_std)
+      mode: none                   # noise-free reference; same 60 s cadence as the noise tiers
       seed: 0
     low:
-      mode: gaussian
-      tier: low
+      mode: gaussian               # gaussian (MEE-space injection)
+      tier: low                    # low | high (Table tab:MEE_std)
       seed: 0
     high:
       mode: gaussian
@@ -46,8 +42,8 @@ sindy:
   time_normalize_columns: false      # time library is already well scaled
   sparsity_tol: 0.02                 # relative RSS tolerance for L-curve selection
   prediction:                        # partial-window future prediction
-    enabled: true                   # fit on the first fit_fraction of the manoeuvre
-    fit_fraction: 0.75
+    enabled: false                   # fit on the first fit_fraction of the manoeuvre
+    fit_fraction: 0.3
     # MEE grid used by the two state-based methods (SINDy / SINDy-UMEE):
     #   reference  - the non-thrusting reference orbit (no future observation,
     #                but those states belong to another trajectory)

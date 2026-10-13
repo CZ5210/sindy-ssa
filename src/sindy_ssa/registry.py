@@ -19,11 +19,13 @@ DEFAULT_BATCH_CONFIG: str = "configs/batch_run.yaml"
 NOISE_CASES: tuple[tuple[str, str, str, int], ...] = (
     ("high", "gaussian", "high", 6),
     ("low", "gaussian", "low", 6),
-    ("reduced", "gaussian", "reduced", 6),
 )
 
+# Deterministic noise-free reference case.  It uses the *same* observation
+# cadence as the noisy tiers so that comparing it with them isolates the absence
+# of noise instead of also giving it a denser sampling grid.
 IDEAL_CASE: tuple[tuple[str, str, str | None, int], ...] = (
-    ("ideal", "none", None, 1),
+    ("ideal", "none", None, 6),
 )
 
 TYPICAL_CASES: tuple[tuple[str, str, str | None, int], ...] = IDEAL_CASE + NOISE_CASES
@@ -32,11 +34,10 @@ TYPICAL_CASES: tuple[tuple[str, str, str | None, int], ...] = IDEAL_CASE + NOISE
 BATCH_CASES: tuple[tuple[str, str], ...] = (
     ("high", "high"),
     ("low", "low"),
-    ("reduced", "reduced"),
 )
 
 # Deterministic noise-free reference case for the batch (single run); plotted as
-# a marker rather than a violin since it has no distribution.
+# a bar / median-only column rather than a violin since it has no distribution.
 BATCH_IDEAL_CASE: str = "ideal"
 
 # method label -> reconstructed-thrust CSV filename (inside methods/<label>/)

@@ -116,8 +116,9 @@ class ObservationConfig:
         """Return the NoiseConfig for ``case``.
 
         For a single (legacy) noise config, ``case`` is ignored.  For a mapping,
-        the matching case is returned; a missing ``ideal`` case is synthesised
-        as ``mode="none"``.
+        the matching case is returned; a missing ``ideal`` case is synthesised as
+        ``mode="none"`` so the noise-free reference works even without an
+        explicit entry in the config.
         """
         if isinstance(self.noise, NoiseConfig):
             return self.noise
@@ -202,7 +203,7 @@ class BatchConfig:
 
     runs: int = 100
     seed0: int = 0
-    cases: list = field(default_factory=lambda: ["high", "low", "reduced"])
+    cases: list = field(default_factory=lambda: ["ideal", "high", "low"])
     prediction: PredictionConfig | None = None
     # Cross-noise overview: use a log y-axis (per panel) instead of linear.
     overview_log: bool = True

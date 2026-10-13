@@ -23,7 +23,7 @@ base: config.yaml
 batch:
   runs: 100                     # number of Monte-Carlo noise realisations
   seed0: 0                      # base seed; run i uses seed0 + i
-  cases: [ideal, high, low, reduced]   # 'ideal' = single deterministic run
+  cases: [ideal, high, low]     # 'ideal' = single deterministic run, the rest are full MC batches
   overview_log: true            # batch_overview y-axis: true = log, false = linear
 
   # Partial-window prediction for the batch.  When ``enabled: true`` the model is
@@ -35,9 +35,13 @@ batch:
   # Omit the whole ``prediction:`` block to inherit ``sindy.prediction`` from
   # config.yaml instead.
   prediction:
-    enabled: true
-    fit_fraction: 0.50          # fit on the first half of the manoeuvre arc
+    enabled: false
+    # The paper's partial-window study uses two observed fractions, 0.30 and
+    # 0.70 (see ``plot_batch_tiers.py``).  This default is the 70 % window; set
+    # it to 0.30 to produce the other one, archiving the two runs under
+    # ``batch_archive/window30/`` and ``batch_archive/window70/``.
+    fit_fraction: 0.70
     # MEE grid of the two state-based methods (SINDy / SINDy-UMEE):
     # reference (non-thrusting orbit) | propagated (self-consistent re-propagation
     # of the identified thrust; see config.yaml).
-    future_state: reference
+    future_state: propagated

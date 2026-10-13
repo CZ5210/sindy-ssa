@@ -46,7 +46,8 @@ emergency **evasive** manoeuvre. Both are processed together.
   `sindy-ssa noise run`.
 - `batch_archive/` — **archived Monte-Carlo results.** The full 100-realisation
   campaign for both scenarios at every noise tier, stored as
-  `<window>/<scenario>/<tier>/` with:
+  `<window>/<scenario>/<tier>/`, where `<window>` is `full` (fully observed),
+  `window30` or `window70` (partial-window prediction), with:
   - `batch_evaluation.csv` and `batch_summary.csv` — the per-run and
     median/IQR metrics actually used in the manuscript;
   - `methods/` and `observation/` — the per-run intermediate thrust and
@@ -63,7 +64,8 @@ emergency **evasive** manoeuvre. Both are processed together.
 - `data/Analysis90/` —— **输入数据**：90 份 Starlink 官方 MEME/ITC 星历文件，用于
   标定观测噪声档位，`sindy-ssa noise run` 需要它。
 - `batch_archive/` —— **蒙特卡洛归档结果**：两个场景、各噪声档、100 次实现，
-  目录为 `<window>/<scenario>/<tier>/`，其中 `batch_evaluation.csv` /
+  目录为 `<window>/<scenario>/<tier>/`（`window` 取 `full`、`window30`、
+  `window70`），其中 `batch_evaluation.csv` /
   `batch_summary.csv` 是论文所用的逐次与中位数/IQR 指标，`methods/` 与
   `observation/` 为逐次中间文件。`plot_batch_tiers.py` 读取评估表即可复现论文的
   batch-tier、vs-window 与汇总热图。
@@ -89,7 +91,7 @@ sindy-ssa/
 │   ├── noise/                   # generated: global noise-calibration CSVs
 │   ├── <scenario>/              # generated: stationkeeping | evasive
 │   │   ├── truth/               #   truth dynamics CSV/JSON
-│   │   ├── typical/<case>/      #   ideal / high / low / reduced reconstruction
+│   │   ├── typical/<case>/      #   ideal / high / low reconstruction
 │   │   └── batch/<case>/        #   Monte-Carlo batch
 │   └── studies/ballistic/       # generated: Cd-uncertainty CSVs (legacy runs)
 ├── batch_archive/               # archived Monte-Carlo results (see §2)
@@ -152,7 +154,7 @@ sindy-ssa noise run --input-dir data/Analysis90
 sindy-ssa dynamics run
 sindy-ssa dynamics plot
 
-# 2) typical reconstruction: ideal / high / low / reduced (both scenarios)
+# 2) typical reconstruction: ideal / high / low (both scenarios)
 sindy-ssa sindy run
 sindy-ssa evaluate
 sindy-ssa sindy plot
@@ -182,14 +184,14 @@ python plot_batch_tiers.py --archive batch_archive --out results/paper
 | `satellite.*` | mass, cross-section, `C_D`, `Isp`, max thrust |
 | `scenarios.<name>` | scenario blocks: `stationkeeping` \| `evasive` |
 | `observation.sampling_rate` | down-sampling factor (`6` → 60 s cadence) |
-| `observation.noise.<case>` | `{mode, tier, seed}`; `mode: gaussian` (MEE-space) \| `none` |
-| `observation.noise.<case>.tier` | `low` \| `high` \| `reduced` (selects the σ table) |
+| `observation.noise.<case>` | `{mode, tier, seed}`; `mode: gaussian` (MEE-space) \| `none`. The noise-free `ideal` case uses the *same* cadence as the noisy tiers, so the comparison isolates the absence of noise |
+| `observation.noise.<case>.tier` | `low` \| `high` (selects the σ table; `reduced` is calibratable but not a study case) |
 | `sindy.smoothing_window_seconds` | Savitzky–Golay window duration `T_w` (s) |
 | `sindy.meefd_spline_smoothing_factor` | MEEFD-Spline smoothing coefficient (`s = factor·n·var(y)`; larger = smoother) |
 | `sindy.normalize_columns` | L2-normalise MEE library columns before ridge/SSR |
 | `sindy.sparsity_tol` | relative RSS tolerance for the L-curve sparsity selection |
 | `sindy.prediction.enabled` | enable partial-window future prediction |
-| `sindy.prediction.fit_fraction` | fraction of the arc used for identification (e.g. `0.75`) |
+| `sindy.prediction.fit_fraction` | fraction of the arc used for identification (`0.70` / `0.30` for the two partial-window runs) |
 | `sindy.prediction.future_state` | MEE grid of the state-based methods: `reference` (non-thrusting orbit) \| `propagated` (self-consistent re-propagation, causal) |
 
 `configs/batch_run.yaml` inherits everything from `config.yaml` through
@@ -227,7 +229,7 @@ Everything is invoked through `sindy-ssa` (or `python -m sindy_ssa`).
 | Option | Default | Meaning |
 |--------|---------|---------|
 | `--config PATH` | `configs/config.yaml` | unified config (single-scenario file → only that scenario) |
-| `--case NAME` | none | restrict to `ideal` / `high` / `low` / `reduced` |
+| `--case NAME` | none | restrict to `ideal` / `high` / `low` |
 | `--data-root PATH` | `data` | root for CSV/JSON output |
 | `--figures-root PATH` | `results` | root for figure output |
 
@@ -244,7 +246,7 @@ Output: `data/<scenario>/truth/Data_{real,ref,LVLH,mano}.csv`, `SatParam.json`,
 ### 8.2 Typical reconstruction / 典型重建
 
 ```bash
-sindy-ssa sindy run        # observation + six methods + re-propagation for all four cases
+sindy-ssa sindy run        # observation + six methods + re-propagation for all three cases
 sindy-ssa evaluate         # write evaluation.csv from the outputs
 sindy-ssa sindy plot       # thrust / Xi heatmaps / reprop / error bars / selection paths
 ```
@@ -275,7 +277,7 @@ then fits on the first `fit_fraction` of the manoeuvre and predicts the remainde
 ```bash
 sindy-ssa batch run                       # configs/batch_run.yaml, both scenarios
 sindy-ssa batch plot
-sindy-ssa batch run --case ideal          # deterministic ideal reference only
+sindy-ssa batch run --case high           # a single noise tier only
 sindy-ssa batch run --runs 5 --case high --data-root data/_pilot --figures-root results/_pilot
 ```
 
@@ -323,7 +325,7 @@ sindy-ssa noise run --input-dir data/Analysis90
 sindy-ssa dynamics run
 
 # Typical + statistical results
-sindy-ssa sindy run                 # ideal / high / low / reduced, six methods
+sindy-ssa sindy run                 # ideal / high / low, six methods
 sindy-ssa evaluate
 sindy-ssa sindy plot
 
@@ -331,8 +333,9 @@ sindy-ssa sindy plot
 sindy-ssa batch run --runs 100
 sindy-ssa batch plot
 
-# Partial-window prediction: set sindy.prediction.enabled: true in batch_run.yaml,
-# then re-run "sindy-ssa batch run --runs 100" for 25 / 50 / 75 % windows.
+# Partial-window prediction: with sindy.prediction.enabled: true in batch_run.yaml,
+# run "sindy-ssa batch run --runs 100" once per observed fraction (0.70 and 0.30),
+# archiving the outputs under batch_archive/window70/ and batch_archive/window30/.
 
 # Archived batch figures (batch_tiers / vs_window / summary heatmaps)
 python plot_batch_tiers.py --archive batch_archive --out results/paper

@@ -92,23 +92,25 @@ def cmd_dynamics_plot(args) -> int:
 
 
 # --------------------------------------------------------------------------- #
-# sindy (typical ideal/high/low/reduced)
+# sindy (typical ideal/high/low)
 # --------------------------------------------------------------------------- #
 def _sindy_cases(cfg: AppConfig, requested_case: str | None) -> list[tuple[str, NoiseConfig, int]]:
     """Return (case_name, noise_config, sampling_rate) tuples for a typical run.
 
     If the config defines ``observation.noise`` as a mapping, iterate its cases.
-    The ``ideal`` case is synthesised when explicitly requested.  Legacy single
-    noise configs fall back to the registry's ``TYPICAL_CASES``.
+    Every case shares the configured observation cadence, so the noise-free
+    ``ideal`` case differs from the noisy tiers only by the absence of noise.
+    The ``ideal`` case is synthesised when explicitly requested and absent from
+    the mapping.  Legacy single noise configs fall back to the registry's
+    ``TYPICAL_CASES``.
     """
     if isinstance(cfg.observation.noise, dict):
         cases: list[tuple[str, NoiseConfig, int]] = []
         for case_name in cfg.observation.noise:
             noise_cfg = cfg.observation.get_noise(case_name)
-            sampling_rate = 1 if noise_cfg.mode in ("none", "ideal", "off") else cfg.observation.sampling_rate
-            cases.append((case_name, noise_cfg, sampling_rate))
+            cases.append((case_name, noise_cfg, cfg.observation.sampling_rate))
         if requested_case == "ideal" and "ideal" not in cfg.observation.noise:
-            cases.append(("ideal", NoiseConfig(mode="none"), 1))
+            cases.append(("ideal", NoiseConfig(mode="none"), cfg.observation.sampling_rate))
         if requested_case is None:
             return cases
         return [(n, c, s) for n, c, s in cases if n == requested_case]
@@ -131,9 +133,8 @@ def _sindy_case_names(cfg: AppConfig, requested_case: str | None) -> list[str]:
         names = [name for name, _, _, _ in TYPICAL_CASES]
     if requested_case:
         names = [n for n in names if n == requested_case]
-        # The ideal case can be synthesised on ``sindy run --case ideal`` even
-        # when it is not listed in the noise mapping.
-        if requested_case == "ideal" and isinstance(cfg.observation.noise, dict) and "ideal" not in cfg.observation.noise:
+        # The ideal case may be synthesised on demand (see ``_sindy_cases``).
+        if requested_case == "ideal" and "ideal" not in names:
             names.append("ideal")
     return names
 
@@ -180,9 +181,9 @@ def cmd_batch_run(args) -> int:
         cases = [c for c in cfg.batch.cases if args.case is None or c == args.case]
         for case_name in cases:
             if case_name == BATCH_IDEAL_CASE:
-                mode, tier, sampling, case_runs = "none", None, 1, 1
+                mode, tier, case_runs = "none", None, 1
             elif case_name in tiers:
-                mode, tier, sampling, case_runs = "gaussian", tiers[case_name], 6, runs
+                mode, tier, case_runs = "gaussian", tiers[case_name], runs
             else:
                 print(f"[skip] unknown batch case {case_name!r}", flush=True)
                 continue
@@ -190,8 +191,9 @@ def cmd_batch_run(args) -> int:
             _set_roots(cfg, args)
             _task_paths(cfg, scenario, "batch", case_name)
             cfg.observation.noise = NoiseConfig(mode=mode, tier=tier or "high")
-            cfg.observation.sampling_rate = sampling
-            cfg.sindy.interpolation_rate = sampling
+            # Every case keeps the configured cadence (including the noise-free
+            # reference), so the comparison isolates the absence of noise.
+            cfg.sindy.interpolation_rate = cfg.observation.sampling_rate
             ensure_noise_calibrated(cfg.paths.noise_data_dir)
             run_batch(cfg, runs=case_runs, seed0=seed0)
     return 0
@@ -269,7 +271,7 @@ def _add_common(p):
 
 
 def _add_case(p, default=None):
-    p.add_argument("--case", default=default, help="case name (e.g. ideal/high/low/reduced)")
+    p.add_argument("--case", default=default, help="case name (e.g. ideal/high/low)")
 
 
 def build_parser() -> argparse.ArgumentParser:
