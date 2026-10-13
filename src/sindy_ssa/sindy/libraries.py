@@ -23,6 +23,11 @@ class LibrarySpec:
     alpha: float
     kappa: float | None = None
     label: str = ""
+    # Re-solve the selected support by OLS after the sparse selection
+    # (PySINDy's ``unbias=True`` semantics, also the ``ps.SSR`` default).  Kept
+    # as a switch so the historical (biased) behaviour can be reproduced for
+    # A/B comparisons; it must stay ``True`` for production runs.
+    unbias: bool = True
 
 
 def _lambdify(symbols, expressions, modules="numpy"):

@@ -67,6 +67,29 @@ def _ridge_refit(theta: np.ndarray, Y: np.ndarray, alpha: float,
     return Xi
 
 
+def _ols_refit(theta: np.ndarray, Y: np.ndarray, Xi: np.ndarray) -> np.ndarray:
+    """Re-solve the support of ``Xi`` by ordinary least squares, per output column.
+
+    This is exactly PySINDy's ``unbias=True`` post-processing
+    (``LinearRegression(fit_intercept=False)`` on the retained terms), and is
+    what the legacy ``ps.SSR(...)`` path did by default.  Without it the ridge
+    penalty keeps shrinking the retained coefficients after the support has been
+    chosen; with unit-normalised columns and ``alpha = 1`` every retained
+    coefficient would be halved.
+
+    ``theta`` must be the library matrix in the *original* (un-normalised) units,
+    which is what :func:`fit_ssr_path` returns, so the result is directly
+    comparable with ``Xi``.
+    """
+    out = np.zeros_like(Xi)
+    for j in range(Y.shape[1]):
+        cols = np.abs(Xi[:, j]) > 0.0
+        if not cols.any():
+            continue
+        out[cols, j] = np.linalg.lstsq(theta[:, cols], Y[:, j], rcond=None)[0]
+    return out
+
+
 class _PathOptimizer:
     """Minimal optimizer exposing ``predict`` for a path-selected model."""
 
@@ -92,6 +115,10 @@ def fit_ssr_path(spec: LibrarySpec, X: np.ndarray, Y: np.ndarray,
     norm for *both* the ridge fit and the greedy magnitude test (matching
     PySINDy's ``normalize_columns`` semantics); the returned ``Xi`` entries are
     rescaled to the original feature units so predictions stay valid.
+
+    Every ``Xi`` on the path is a **ridge** solution; de-biasing the selected
+    support (OLS) is the caller's job — see :func:`_ols_refit` and
+    :func:`fit_ssr_auto`.
 
     Returns ``(library, Theta, path)`` with entries ``max_iter`` (deletions
     per column), ``rss``, ``n_active`` and ``Xi``.
@@ -193,18 +220,36 @@ def select_elbow(path: list[dict], min_active: int = 3,
 
 def fit_ssr_auto(spec: LibrarySpec, X: np.ndarray, Y: np.ndarray,
                  normalize_columns: bool = False,
-                 tol: float = DEFAULT_SPARSITY_TOL):
+                 tol: float = DEFAULT_SPARSITY_TOL,
+                 unbias: bool | None = None):
     """Fit SSR and select the sparsity level automatically via the L-curve elbow.
 
-    The returned optimizer is exactly the selected point on the deletion
-    path, so the plotted curve and the used model are always consistent.
+    The support is selected exactly as before: the greedy deletion path from
+    :func:`fit_ssr_path` (ridge refits only) drives :func:`select_elbow`, so the
+    plotted curve, the manuscript's κ rule and the selected iteration are
+    unchanged.  What *is* new is the last step: the coefficients on the selected
+    support are re-solved by ordinary least squares (:func:`_ols_refit`), i.e.
+    PySINDy's ``unbias=True`` semantics (the ``ps.SSR`` default used by the
+    legacy pipeline).  Skipping it left the ridge penalty shrinking the retained
+    coefficients, which is what made the identified derivative model systematically
+    too small.
+
+    ``unbias`` overrides :attr:`LibrarySpec.unbias`; ``None`` (default) uses the
+    spec's setting (``True`` for every library defined in this package).
+
     ``tol`` is the relative RSS tolerance of :func:`select_elbow`.
 
-    Returns ``(library, optimizer, Xi, Theta, selected_iter, path)``.
+    Returns ``(library, optimizer, Xi, Theta, selected_iter, path)``.  ``Xi`` is
+    the de-biased model on the selected support; ``path`` still holds the ridge
+    deletion path (that is the L-curve, so it is left untouched).
     """
+    if unbias is None:
+        unbias = getattr(spec, "unbias", True)
     library, theta, path = fit_ssr_path(spec, X, Y, normalize_columns=normalize_columns)
     selected_iter = select_elbow(path, tol=tol)
     Xi = next(p["Xi"] for p in path if p["max_iter"] == selected_iter)
+    if unbias:
+        Xi = _ols_refit(theta, Y, Xi)
     optimizer = _PathOptimizer(Xi)
     return library, optimizer, Xi, theta, selected_iter, path
 

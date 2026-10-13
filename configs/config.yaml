@@ -48,7 +48,12 @@ sindy:
   prediction:                        # partial-window future prediction
     enabled: true                   # fit on the first fit_fraction of the manoeuvre
     fit_fraction: 0.75
-    future_state: reference          # reference (causal) | observed (non-causal)
+    # MEE grid used by the two state-based methods (SINDy / SINDy-UMEE):
+    #   reference  - the non-thrusting reference orbit (no future observation,
+    #                but those states belong to another trajectory)
+    #   propagated - self-consistent: observed states inside the fit window, then
+    #                the trajectory re-propagated with the identified thrust
+    future_state: propagated          # reference | propagated
 
 paths:
   data_root: data

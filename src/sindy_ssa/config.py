@@ -142,15 +142,23 @@ class PredictionConfig:
 
     部分窗口预测：用机动弧前 ``fit_fraction`` 拟合，预测剩余部分。
 
-    ``future_state`` selects where the SINDy-UMEE / SINDy state-based
-    methods get their future MEE states: ``reference`` (causally propagate the
-    reference orbit, deployable) or ``observed`` (use the known future states,
-    non-causal, for generalisation studies).
+    All four predictive methods are identified on the first ``fit_fraction`` of
+    the arc; only ``future_state`` differs in how the two **state-based** methods
+    (SINDy / SINDy-UMEE) obtain the MEE states they are evaluated on:
+
+    - ``reference`` — the reference (non-thrusting) orbit.  No future
+      observation is used, but those states belong to another trajectory, which
+      the derivative-based SINDy is extremely sensitive to.
+    - ``propagated`` — self-consistent: inside the fit window the observed states
+      are used, beyond it the trajectory is re-propagated with the identified
+      thrust itself, and the model is re-evaluated on the propagated states
+      (causal, fixed-point sweep).  The sweep length and its under-relaxation are
+      internal constants of the pipeline, not user-facing.
     """
 
     enabled: bool = False
     fit_fraction: float = 0.5
-    future_state: str = "reference"  # "reference" | "observed"
+    future_state: str = "reference"  # "reference" | "propagated"
 
 
 @dataclass

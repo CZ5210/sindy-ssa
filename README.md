@@ -190,7 +190,7 @@ python plot_batch_tiers.py --archive batch_archive --out results/paper
 | `sindy.sparsity_tol` | relative RSS tolerance for the L-curve sparsity selection |
 | `sindy.prediction.enabled` | enable partial-window future prediction |
 | `sindy.prediction.fit_fraction` | fraction of the arc used for identification (e.g. `0.75`) |
-| `sindy.prediction.future_state` | `reference` (causal) \| `observed` (non-causal) |
+| `sindy.prediction.future_state` | MEE grid of the state-based methods: `reference` (non-thrusting orbit) \| `propagated` (self-consistent re-propagation, causal) |
 
 `configs/batch_run.yaml` inherits everything from `config.yaml` through
 `base: config.yaml` and only overrides the `batch:` block (`runs`, `seed0`,
@@ -262,9 +262,12 @@ then fits on the first `fit_fraction` of the manoeuvre and predicts the remainde
   over the full arc and evaluated (EPE / EI).
 - **Non-predictive** — `MEEFD-SG`, `MEEFD-Spline`: the thrust curve stops at the fit
   horizon; they do not participate in re-propagation / EPE / EI.
-- State-based methods (`SINDy` / `SINDy-UMEE`) use the reference-orbit MEE for a
-  causal forecast (`future_state: reference`) or the known future observed MEE for a
-  non-causal generalisation study (`observed`).
+- State-based methods (`SINDy` / `SINDy-UMEE`) are evaluated on an MEE grid chosen by
+  `future_state`: `reference` (the non-thrusting reference orbit) or `propagated`
+  (self-consistent: observed states inside the fit window, then the trajectory
+  re-propagated with the identified thrust itself — a causal forecast; the
+  fixed-point sweep and its under-relaxation are internal pipeline constants).
+  Per-sweep previews are written to `methods/<method>/propagation_iter/`.
 - The `thrust_comparison` figure marks the fit horizon with a red dashed line.
 
 ### 8.4 Monte-Carlo batch / 蒙特卡洛批处理

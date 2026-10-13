@@ -36,5 +36,8 @@ batch:
   # config.yaml instead.
   prediction:
     enabled: true
-    fit_fraction: 0.50          # fit on the first 75% of the manoeuvre arc
-    future_state: reference     # reference (causal) | observed (non-causal)
+    fit_fraction: 0.50          # fit on the first half of the manoeuvre arc
+    # MEE grid of the two state-based methods (SINDy / SINDy-UMEE):
+    # reference (non-thrusting orbit) | propagated (self-consistent re-propagation
+    # of the identified thrust; see config.yaml).
+    future_state: reference
