@@ -23,7 +23,8 @@ tables directly (no config or CLI needed) and renders:
   over the MC runs) with its IQR shaded;
 * the ``batch_heatmap`` summary tables---colour-coded replacements for the
   hand-written result tables, one for the fully observed campaign and one
-  stacking the partial windows.
+  stacking the partial windows.  A median that exceeds the scenario's failure
+  criterion (``FAILURE_THRESHOLDS``) is painted black.
 
 Both the ``plot_batch_tiers.py`` entry script and ``sindy-ssa batch paper``
 call :func:`plot_archive_figures`, so the figure set has a single definition.
@@ -60,6 +61,35 @@ NOISE_CASES = ("high", "low")
 # Deterministic noise-free reference case, drawn as an extra column.
 IDEAL_CASE = "ideal"
 
+# Fixed y-ranges of the batch_vs_window convergence chart, per scenario and
+# metric row---the planar EPE in km, the planar EI in m/s.  A handful of
+# outlying runs would otherwise stretch the axis and flatten every method's
+# convergence curve.  Scenarios missing here keep the automatic range.
+CONVERGENCE_Y_LIMITS = {
+    "stationkeeping": {"epe_planar": (0.0, 50.0), "ei_planar": (0.0, 18.0)},
+    "evasive": {"epe_planar": (0.0, 20.0), "ei_planar": (0.0, 7.0)},
+}
+
+# Failure criteria drawn as red dashed reference lines on the metric rows.
+# Keyed by the metric column: EPE in km (marking the EPE row, which the 3D/2D
+# glyphs share) and the planar 2D error integral in m/s.  Both keys are planar
+# 2D columns so the same mapping also drives the planar-only convergence chart.
+FAILURE_THRESHOLDS = {
+    "stationkeeping": {"epe_planar": 30.0, "ei_planar": 12.0},
+    "evasive": {"epe_planar": 12.0, "ei_planar": 5.0},
+}
+
+# Heatmap metric column -> failure-criterion key.  The 3D and planar 2D variants
+# of a metric share one criterion (as in the tier figure, where the threshold
+# spans the whole row), so both end-position-error rows map to ``epe_planar``
+# and both error-integral rows to ``ei_planar``.
+_FAILURE_THRESHOLD_KEY = {
+    "epe": "epe_planar",
+    "epe_planar": "epe_planar",
+    "ei_total": "ei_planar",
+    "ei_planar": "ei_planar",
+}
+
 # (evaluation-column, label) row groups for the full-observation heatmaps.
 FULL_METRICS = (
     ("epe", r"$\mathcal{EPE}_{\mathrm{3D}}$ (km)"),
@@ -80,7 +110,9 @@ def _summary_group(label: str, scenario_data: dict, methods, column: str) -> dic
     ``scenario_data`` maps every column-block key (see ``SCENARIO_BLOCKS``) to
     that scenario's ``(tier frames, ideal frame)`` pair.  Each method gets the
     median and IQR over its Monte-Carlo runs per tier and the single
-    deterministic ideal median (no IQR).
+    deterministic ideal median (no IQR).  The returned group also carries a
+    ``thresholds`` mapping (block key -> failure value) so the heatmap can flag
+    the medians that exceed the failure criterion of their scenario.
     """
     data = {}
     for block, (tier_data, ideal_df) in scenario_data.items():
@@ -109,7 +141,12 @@ def _summary_group(label: str, scenario_data: dict, methods, column: str) -> dic
                 entry[method] = method_entry
         if entry:
             data[block] = entry
-    return {"label": label, "methods": list(methods), "data": data}
+    thresholds = {
+        block: _failure_threshold(block, column) for block in scenario_data
+    }
+    thresholds = {block: value for block, value in thresholds.items() if value is not None}
+    return {"label": label, "methods": list(methods), "data": data,
+            "thresholds": thresholds}
 
 
 def _write_heatmap(row_groups, save_path: str, png: bool, saved: list[str]) -> bool:
@@ -140,6 +177,12 @@ def _scenario_frames(archive: str, window: str, scenario: str) -> tuple[dict, pd
         if df is not None:
             tiers[tier] = df
     return tiers, _load_case(archive, window, scenario, IDEAL_CASE)
+
+
+def _failure_threshold(scenario: str, column: str):
+    """Failure value for one heatmap metric column, or ``None`` if undefined."""
+    key = _FAILURE_THRESHOLD_KEY.get(column)
+    return FAILURE_THRESHOLDS.get(scenario, {}).get(key) if key else None
 
 
 def _present_methods(frames) -> list[str]:
@@ -185,6 +228,7 @@ def plot_archive_figures(archive: str, out_dir: str | None = None, *,
             plot_metric_tiers(
                 case_data, noise_cases, save_path=save_path,
                 log_scale=log_scale, png=png,
+                thresholds=FAILURE_THRESHOLDS.get(scenario),
             )
             saved.append(save_path + ".pdf")
 
@@ -218,6 +262,8 @@ def plot_archive_figures(archive: str, out_dir: str | None = None, *,
         plot_metric_vs_window(
             window_data, windows, list(NOISE_CASES), ideal_data=ideal_data,
             methods=methods, save_path=save_path, png=png, log_scale=log_scale,
+            y_limits=CONVERGENCE_Y_LIMITS.get(scenario),
+            thresholds=FAILURE_THRESHOLDS.get(scenario),
         )
         saved.append(save_path + ".pdf")
 

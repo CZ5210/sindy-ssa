@@ -318,8 +318,19 @@ def _draw_half(ax, samples, pos: float, color, width: float = _HALF_WIDTH,
     _draw_box(ax, samples, pos + width / 2.0, color, width, hatch=hatch)
 
 
+def _threshold_for(thresholds, columns):
+    """First failure threshold present among ``columns``, else ``None``."""
+    if not thresholds:
+        return None
+    for col in columns:
+        if col in thresholds:
+            return thresholds[col]
+    return None
+
+
 def plot_metric_tiers(case_data, noise_cases,
-                      save_path=None, log_scale=True, show=False, png=True):
+                      save_path=None, log_scale=True, show=False, png=True,
+                      thresholds=None):
     """Tier-separated batch overview: a 2xN grid of metric panels.
 
     Rows are the two error metrics---:math:`\\mathcal{EPE}` on top and
@@ -332,7 +343,8 @@ def plot_metric_tiers(case_data, noise_cases,
     the full 3D metric and the hatched glyph its planar 2D variant; the texture
     key is added to the method legend, which is drawn once on the right.
     ``log_scale`` selects a logarithmic y-axis and ``png`` also writes a raster
-    preview next to the PDF.
+    preview next to the PDF.  ``thresholds`` maps a metric column to a failure
+    value drawn as a red dashed line across that metric's row.
     """
     # Row groups: (y-axis label, 3D column, planar 2D column).
     rows = [
@@ -360,6 +372,7 @@ def plot_metric_tiers(case_data, noise_cases,
         squeeze=False, sharex=False, sharey=False,
     )
     for r, (title, col_3d, col_2d) in enumerate(rows):
+        threshold = _threshold_for(thresholds, (col_3d, col_2d))
         for c, case in enumerate(noise_cases):
             ax = axes[r][c]
             df = case_data[case]
@@ -382,6 +395,9 @@ def plot_metric_tiers(case_data, noise_cases,
             ax.tick_params(axis="y", labelsize=FONT_SIZE - 2)
             if log_scale:
                 _log_y_integer_powers(ax)
+            if threshold is not None:
+                ax.axhline(threshold, color="red", linestyle="--", linewidth=1.5,
+                           zorder=5)
             # Metric label down the left edge, tier label across the top row.
             if c == 0:
                 ax.set_ylabel(title, fontsize=FONT_SIZE + 2)
@@ -445,7 +461,8 @@ def _draw_single_window(ax, x: float, median: float, q1: float, q3: float,
 
 
 def plot_metric_vs_window(case_data, windows, tiers, ideal_data=None, save_path=None,
-                          methods=None, title=None, show=False, png=True, log_scale=True):
+                          methods=None, title=None, show=False, png=True, log_scale=True,
+                          y_limits=None, thresholds=None):
     """Convergence with the observed fraction: a 2xN metric grid.
 
     Rows are the planar 2D metrics (:math:`\\mathcal{EPE}_{2D}` and
@@ -456,12 +473,19 @@ def plot_metric_vs_window(case_data, windows, tiers, ideal_data=None, save_path=
     ``windows`` (e.g. 30, 70).  When ``ideal_data`` (``window -> DataFrame``)
     is supplied an extra deterministic ``Ideal`` column is appended, drawn as
     single markers with no band.  Methods share the global colour palette;
-    ``log_scale`` selects a logarithmic y-axis.
+    ``log_scale`` selects a logarithmic y-axis.  ``y_limits`` may pin the
+    y-range of a metric row---it maps the evaluation column (e.g.
+    ``"epe_planar"``) to a ``(lo, hi)`` pair applied to every panel of that
+    row, so the EPE convergence stays readable when a few outlying runs would
+    otherwise stretch the axis; under ``log_scale`` a non-positive lower bound
+    is clamped to ``hi / 1000``.
 
     ``methods`` may also list a method that exists in one window only---the two
     non-predictive MEEFD baselines are evaluated on the fully observed arc and
     appear nowhere else.  Those are drawn at their single window as the box glyph
     of :func:`_draw_single_window` and get a marker-only legend entry.
+    ``thresholds`` maps a metric column to a failure value, drawn as a red dashed
+    line across every panel of that metric's row, the ideal column included.
     """
     rows = [
         (r"$\mathcal{EPE}_{\mathrm{2D}}$ (km)", "epe_planar"),
@@ -499,6 +523,7 @@ def plot_metric_vs_window(case_data, windows, tiers, ideal_data=None, save_path=
         squeeze=False, sharex=False, sharey=False,
     )
     for r, (ylabel, col) in enumerate(rows):
+        threshold = (thresholds or {}).get(col)
         for c, (name, is_ideal) in enumerate(columns):
             ax = axes[r][c]
             for i, method in enumerate(ordered):
@@ -546,6 +571,22 @@ def plot_metric_vs_window(case_data, windows, tiers, ideal_data=None, save_path=
             ax.tick_params(axis="y", labelsize=FONT_SIZE - 2)
             if log_scale:
                 _log_y_integer_powers(ax)
+            if y_limits and col in y_limits:
+                lo, hi = y_limits[col]
+                if log_scale and lo <= 0:
+                    lo = hi / 1000.0
+                ax.set_ylim(lo, hi)
+            if threshold is not None:
+                ax.axhline(threshold, color="red", linestyle="--", linewidth=1.5,
+                           zorder=5)
+                # axhline sits in a mixed transform and takes no part in the
+                # y-autoscaling, so a panel whose auto range falls below the
+                # threshold (typical of the noise-free ideal column) would clip
+                # the line; widen the top of such a range to keep it visible.
+                if not (y_limits and col in y_limits):
+                    lo, hi = ax.get_ylim()
+                    if threshold > hi:
+                        ax.set_ylim(lo, threshold * 1.08)
 
     # A single-window method gets a marker-only legend entry, so the two glyph
     # families (convergence lines vs. the 100%-only box) are told apart.
@@ -601,6 +642,9 @@ _HEATMAP_TIER_LABELS = {"high": "High", "low": "Low"}
 _HEATMAP_LABEL_COLOR = "black"
 _HEATMAP_TEXT_COLOR = "white"
 _HEATMAP_EDGE_COLOR = "#8c8c8c"
+# A median that exceeds its scenario's failure criterion is flagged uniformly in
+# black, overriding the warm metric colour map.
+_HEATMAP_FAIL_COLOR = "black"
 _HEATMAP_MEDIAN_RANGE = (0.45, 1.0)
 _HEATMAP_IQR_RANGE = (0.45, 1.0)
 
@@ -685,7 +729,16 @@ def plot_summary_heatmap(row_groups, save_path=None,
                 },
                 ...
             },
+            "thresholds": {          # optional; block key -> failure value
+                "stationkeeping": 30.0,
+                ...
+            },
         }
+
+    When a group carries ``thresholds``, every median cell in that column block
+    whose value exceeds its threshold is painted in one shared colour (black)
+    instead of the warm metric colour map, so a method that misses the failure
+    criterion stands out identically across all metric rows.
 
     Colour scaling is applied once per metric row group and per statistic: all
     median cells of a block (the noise tiers *and* the ideal reference) share one
@@ -759,6 +812,7 @@ def plot_summary_heatmap(row_groups, save_path=None,
             scales[stat] = (min(values), max(values)) if values else (None, None)
 
         cells = {}
+        thresholds = group.get("thresholds") or {}
         for method in methods:
             cells[method] = {}
             for column in data_cols:
@@ -777,8 +831,18 @@ def plot_summary_heatmap(row_groups, save_path=None,
                     pos = 0.5
                 cmap = median_cmap_obj if stat == "median" else iqr_cmap_obj
                 facecolor = cmap(float(np.clip(pos, 0.0, 1.0)))
+                # A median above the scenario's failure criterion is flagged in a
+                # single shared colour, so a failure reads the same in every row.
+                threshold = thresholds.get(block_key)
+                failed = (
+                    stat == "median"
+                    and threshold is not None
+                    and value > float(threshold)
+                )
+                if failed:
+                    facecolor = _HEATMAP_FAIL_COLOR
                 column_values = per_column[column]
-                best = bool(column_values) and value == min(column_values)
+                best = (not failed) and bool(column_values) and value == min(column_values)
                 cells[method][column] = (
                     _summary_fmt(value, decimals), facecolor, True, best
                 )
@@ -1067,9 +1131,12 @@ def plot_selection_path(path, save_path=None, title=None, show=False):
     line_proxy = plt.Line2D([0], [0], color="steelblue", marker="o", markersize=3,
                             linewidth=1, linestyle="-")
     env_proxy = plt.Line2D([0], [0], color="darkorange", linewidth=1.4)
-    fig.legend([line_proxy, env_proxy],
+    sel_proxy = plt.Line2D([0], [0], color="red", marker="o", markersize=9,
+                           linewidth=0, linestyle="None")
+    fig.legend([line_proxy, env_proxy, sel_proxy],
                [r"$\mathrm{RSS}(n_a)$",
-                r"$\overline{\mathrm{RSS}}(n_a)$"],
+                r"$\overline{\mathrm{RSS}}(n_a)$",
+                "Selected sparsity"],
                loc="center left", bbox_to_anchor=(1.02, 0.5), fontsize=LEGEND_FONT_SIZE + 1)
 
     fig.tight_layout()
