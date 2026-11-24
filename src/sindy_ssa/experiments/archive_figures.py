@@ -23,8 +23,8 @@ tables directly (no config or CLI needed) and renders:
   over the MC runs) with its IQR shaded;
 * the ``batch_heatmap`` summary tables---colour-coded replacements for the
   hand-written result tables, one for the fully observed campaign and one
-  stacking the partial windows.  A median that exceeds the scenario's failure
-  criterion (``FAILURE_THRESHOLDS``) is painted black.
+  stacking the partial windows.  Each metric block shows the zero-thrust
+  reference, and paired EPE and EI medians are painted black when both exceed it.
 
 Both the ``plot_batch_tiers.py`` entry script and ``sindy-ssa batch paper``
 call :func:`plot_archive_figures`, so the figure set has a single definition.
@@ -70,25 +70,13 @@ CONVERGENCE_Y_LIMITS = {
     "evasive": {"epe_planar": (0.0, 20.0), "ei_planar": (0.0, 7.0)},
 }
 
-# Failure criteria drawn as red dashed reference lines on the metric rows.
-# Keyed by the metric column: EPE in km (marking the EPE row, which the 3D/2D
-# glyphs share) and the planar 2D error integral in m/s.  Both keys are planar
-# 2D columns so the same mapping also drives the planar-only convergence chart.
-FAILURE_THRESHOLDS = {
+# Fallback dashed lines for archives without zero-thrust reference CSVs.
+_LEGACY_LINE_THRESHOLDS = {
     "stationkeeping": {"epe_planar": 30.0, "ei_planar": 12.0},
     "evasive": {"epe_planar": 12.0, "ei_planar": 5.0},
 }
 
-# Heatmap metric column -> failure-criterion key.  The 3D and planar 2D variants
-# of a metric share one criterion (as in the tier figure, where the threshold
-# spans the whole row), so both end-position-error rows map to ``epe_planar``
-# and both error-integral rows to ``ei_planar``.
-_FAILURE_THRESHOLD_KEY = {
-    "epe": "epe_planar",
-    "epe_planar": "epe_planar",
-    "ei_total": "ei_planar",
-    "ei_planar": "ei_planar",
-}
+_METRIC_PAIRS = (("epe", "ei_total"), ("epe_planar", "ei_planar"))
 
 # (evaluation-column, label) row groups for the full-observation heatmaps.
 FULL_METRICS = (
@@ -110,9 +98,7 @@ def _summary_group(label: str, scenario_data: dict, methods, column: str) -> dic
     ``scenario_data`` maps every column-block key (see ``SCENARIO_BLOCKS``) to
     that scenario's ``(tier frames, ideal frame)`` pair.  Each method gets the
     median and IQR over its Monte-Carlo runs per tier and the single
-    deterministic ideal median (no IQR).  The returned group also carries a
-    ``thresholds`` mapping (block key -> failure value) so the heatmap can flag
-    the medians that exceed the failure criterion of their scenario.
+    deterministic ideal median (no IQR).
     """
     data = {}
     for block, (tier_data, ideal_df) in scenario_data.items():
@@ -141,12 +127,43 @@ def _summary_group(label: str, scenario_data: dict, methods, column: str) -> dic
                 entry[method] = method_entry
         if entry:
             data[block] = entry
-    thresholds = {
-        block: _failure_threshold(block, column) for block in scenario_data
+    return {"label": label, "methods": list(methods), "data": data}
+
+
+def _exceeding_cases(group: dict) -> set[tuple[str, str, str]]:
+    """Return the (scenario, method, tier) keys above this metric's reference."""
+    return {
+        (scenario, method, tier)
+        for scenario, reference in group["reference_values"].items()
+        for method, tiers in group["data"].get(scenario, {}).items()
+        for tier, stats in tiers.items()
+        if np.isfinite(stats["median"]) and stats["median"] > reference
     }
-    thresholds = {block: value for block, value in thresholds.items() if value is not None}
-    return {"label": label, "methods": list(methods), "data": data,
-            "thresholds": thresholds}
+
+
+def _summary_groups(scenario_data, metrics, references, prefix="") -> list[dict]:
+    """Build the metric groups and pair failures within one evaluation window."""
+    methods = _present_methods(
+        [df for tiers, ideal in scenario_data.values() for df in (*tiers.values(), ideal)]
+    )
+    groups = {
+        column: _summary_group(prefix + label, scenario_data, methods, column)
+        for column, label in metrics
+    }
+    for epe, ei in _METRIC_PAIRS:
+        if epe not in groups or ei not in groups:
+            continue
+        for column, label in ((epe, r"$\mathcal{EPE}_0$"), (ei, r"$\mathcal{EI}_0$")):
+            groups[column]["reference_label"] = label
+            groups[column]["reference_values"] = {
+                scenario: references[scenario][column]
+                for scenario in scenario_data
+                if column in references.get(scenario, {})
+            }
+        failed_cases = _exceeding_cases(groups[epe]) & _exceeding_cases(groups[ei])
+        groups[epe]["failed_cases"] = failed_cases
+        groups[ei]["failed_cases"] = failed_cases
+    return list(groups.values())
 
 
 def _write_heatmap(row_groups, save_path: str, png: bool, saved: list[str]) -> bool:
@@ -179,10 +196,19 @@ def _scenario_frames(archive: str, window: str, scenario: str) -> tuple[dict, pd
     return tiers, _load_case(archive, window, scenario, IDEAL_CASE)
 
 
-def _failure_threshold(scenario: str, column: str):
-    """Failure value for one heatmap metric column, or ``None`` if undefined."""
-    key = _FAILURE_THRESHOLD_KEY.get(column)
-    return FAILURE_THRESHOLDS.get(scenario, {}).get(key) if key else None
+def _load_zero_thrust_references(archive: str) -> dict:
+    """Read the available finite zero-thrust metrics for each archived scenario."""
+    references = {}
+    columns = {column for pair in _METRIC_PAIRS for column in pair}
+    for scenario in SCENARIOS:
+        path = os.path.join(archive, "zero_thrust_reference", f"{scenario}.csv")
+        if not os.path.isfile(path):
+            continue
+        frame = pd.read_csv(path, usecols=lambda column: column in columns)
+        if not frame.empty:
+            values = pd.to_numeric(frame.iloc[0], errors="coerce")
+            references[scenario] = values[np.isfinite(values)].to_dict()
+    return references
 
 
 def _present_methods(frames) -> list[str]:
@@ -209,6 +235,15 @@ def plot_archive_figures(archive: str, out_dir: str | None = None, *,
     ensure_dir(out_dir)
     saved: list[str] = []
 
+    references = _load_zero_thrust_references(archive)
+    reference_lines = {
+        scenario: {
+            column: references.get(scenario, {}).get(column, fallback)
+            for column, fallback in thresholds.items()
+        }
+        for scenario, thresholds in _LEGACY_LINE_THRESHOLDS.items()
+    }
+
     for window, _ in PAPER_WINDOWS:
         for scenario in SCENARIOS:
             case_data = {}
@@ -228,7 +263,7 @@ def plot_archive_figures(archive: str, out_dir: str | None = None, *,
             plot_metric_tiers(
                 case_data, noise_cases, save_path=save_path,
                 log_scale=log_scale, png=png,
-                thresholds=FAILURE_THRESHOLDS.get(scenario),
+                thresholds=reference_lines[scenario],
             )
             saved.append(save_path + ".pdf")
 
@@ -263,7 +298,7 @@ def plot_archive_figures(archive: str, out_dir: str | None = None, *,
             window_data, windows, list(NOISE_CASES), ideal_data=ideal_data,
             methods=methods, save_path=save_path, png=png, log_scale=log_scale,
             y_limits=CONVERGENCE_Y_LIMITS.get(scenario),
-            thresholds=FAILURE_THRESHOLDS.get(scenario),
+            thresholds=reference_lines[scenario],
         )
         saved.append(save_path + ".pdf")
 
@@ -274,30 +309,15 @@ def plot_archive_figures(archive: str, out_dir: str | None = None, *,
     full_blocks = {key: _scenario_frames(archive, "full", key) for key, _ in SCENARIO_BLOCKS}
     full_blocks = {key: frames for key, frames in full_blocks.items() if frames[0]}
     if full_blocks:
-        methods = _present_methods(
-            [df for tiers, ideal in full_blocks.values()
-             for df in (*tiers.values(), ideal)]
-        )
-        groups = [
-            _summary_group(label, full_blocks, methods, column)
-            for column, label in FULL_METRICS
-        ]
+        groups = _summary_groups(full_blocks, FULL_METRICS, references)
         _write_heatmap(groups, os.path.join(out_dir, "batch_heatmap"), png, saved)
 
     groups = []
     for window, fraction in WINDOW_FRACTIONS:
         blocks = {key: _scenario_frames(archive, window, key) for key, _ in SCENARIO_BLOCKS}
         blocks = {key: frames for key, frames in blocks.items() if frames[0]}
-        if not blocks:
-            continue
-        methods = _present_methods(
-            [df for tiers, ideal in blocks.values() for df in (*tiers.values(), ideal)]
-        )
-        for column, label in PARTIAL_METRICS:
-            groups.append(
-                _summary_group(f"{fraction}% observed: {label}", blocks,
-                               methods, column)
-            )
+        if blocks:
+            groups.extend(_summary_groups(blocks, PARTIAL_METRICS, references, prefix=f"{fraction}% observed: "))
     _write_heatmap(groups, os.path.join(out_dir, "batch_heatmap_windows"), png, saved)
 
     return saved

@@ -579,14 +579,9 @@ def plot_metric_vs_window(case_data, windows, tiers, ideal_data=None, save_path=
             if threshold is not None:
                 ax.axhline(threshold, color="red", linestyle="--", linewidth=1.5,
                            zorder=5)
-                # axhline sits in a mixed transform and takes no part in the
-                # y-autoscaling, so a panel whose auto range falls below the
-                # threshold (typical of the noise-free ideal column) would clip
-                # the line; widen the top of such a range to keep it visible.
-                if not (y_limits and col in y_limits):
-                    lo, hi = ax.get_ylim()
-                    if threshold > hi:
-                        ax.set_ylim(lo, threshold * 1.08)
+                lo, hi = ax.get_ylim()
+                if threshold >= hi:
+                    ax.set_ylim(lo, threshold * 1.08)
 
     # A single-window method gets a marker-only legend entry, so the two glyph
     # families (convergence lines vs. the 100%-only box) are told apart.
@@ -642,8 +637,7 @@ _HEATMAP_TIER_LABELS = {"high": "High", "low": "Low"}
 _HEATMAP_LABEL_COLOR = "black"
 _HEATMAP_TEXT_COLOR = "white"
 _HEATMAP_EDGE_COLOR = "#8c8c8c"
-# A median that exceeds its scenario's failure criterion is flagged uniformly in
-# black, overriding the warm metric colour map.
+# Flagged medians use black, overriding the warm metric colour map.
 _HEATMAP_FAIL_COLOR = "black"
 _HEATMAP_MEDIAN_RANGE = (0.45, 1.0)
 _HEATMAP_IQR_RANGE = (0.45, 1.0)
@@ -729,16 +723,14 @@ def plot_summary_heatmap(row_groups, save_path=None,
                 },
                 ...
             },
-            "thresholds": {          # optional; block key -> failure value
-                "stationkeeping": 30.0,
-                ...
-            },
+             "reference_label": r"$\\mathcal{EPE}_0$",  # optional
+             "reference_values": {"stationkeeping": 57.16},
+             "failed_cases": {("stationkeeping", "MEEFD-SG", "high")},
         }
 
-    When a group carries ``thresholds``, every median cell in that column block
-    whose value exceeds its threshold is painted in one shared colour (black)
-    instead of the warm metric colour map, so a method that misses the failure
-    criterion stands out identically across all metric rows.
+    Reference values span the median tiers of their block and have no IQR.
+    Each ``(block, method, tier)`` in ``failed_cases`` flags a median cell in
+    black. Groups can also supply legacy scalar ``thresholds`` by block.
 
     Colour scaling is applied once per metric row group and per statistic: all
     median cells of a block (the noise tiers *and* the ideal reference) share one
@@ -813,6 +805,7 @@ def plot_summary_heatmap(row_groups, save_path=None,
 
         cells = {}
         thresholds = group.get("thresholds") or {}
+        failed_cases = group.get("failed_cases", ())
         for method in methods:
             cells[method] = {}
             for column in data_cols:
@@ -831,13 +824,10 @@ def plot_summary_heatmap(row_groups, save_path=None,
                     pos = 0.5
                 cmap = median_cmap_obj if stat == "median" else iqr_cmap_obj
                 facecolor = cmap(float(np.clip(pos, 0.0, 1.0)))
-                # A median above the scenario's failure criterion is flagged in a
-                # single shared colour, so a failure reads the same in every row.
                 threshold = thresholds.get(block_key)
-                failed = (
-                    stat == "median"
-                    and threshold is not None
-                    and value > float(threshold)
+                failed = stat == "median" and (
+                    (block_key, method, tier) in failed_cases
+                    or (threshold is not None and value > float(threshold))
                 )
                 if failed:
                     facecolor = _HEATMAP_FAIL_COLOR
@@ -846,9 +836,15 @@ def plot_summary_heatmap(row_groups, save_path=None,
                 cells[method][column] = (
                     _summary_fmt(value, decimals), facecolor, True, best
                 )
-        groups.append({"label": group["label"], "methods": methods, "cells": cells})
+        groups.append({
+            "label": group["label"],
+            "methods": methods,
+            "cells": cells,
+            "reference_label": group.get("reference_label", ""),
+            "reference_values": group.get("reference_values", {}),
+        })
 
-    n_body = sum(1 + len(group["methods"]) for group in groups)
+    n_body = sum(1 + bool(group["reference_values"]) + len(group["methods"]) for group in groups)
     # Header levels: the optional block row, the statistic row and the tier row.
     n_header = 3 if blocks else 2
     n_rows = n_header + n_body
@@ -875,8 +871,8 @@ def plot_summary_heatmap(row_groups, save_path=None,
     # header ("Median" / "IQR") and one tier label per column.  Header / method /
     # label cells stay white with black text; only the coloured data cells use
     # white text.
-    def _span_header(block_key, stat, row: float, label: str) -> None:
-        """Draw one white header cell spanning the columns it labels."""
+    def _span_cell(block_key, stat, row: float, label: str) -> None:
+        """Draw one white cell spanning the selected columns."""
         idx = [
             j for j, column in enumerate(data_cols)
             if column[0] == block_key and (stat is None or column[2] == stat)
@@ -885,8 +881,9 @@ def plot_summary_heatmap(row_groups, save_path=None,
             return
         x0, x1 = x_edges[1 + idx[0]], x_edges[1 + idx[-1] + 1]
         cell(x0, row, x1 - x0, 1.0, "white")
-        ax.text((x0 + x1) / 2.0, row + 0.5, label, ha="center", va="center",
-                fontsize=fontsize + 1, fontweight="bold", color=_HEATMAP_LABEL_COLOR)
+        if label:
+            ax.text((x0 + x1) / 2.0, row + 0.5, label, ha="center", va="center",
+                    fontsize=fontsize + 1, fontweight="bold", color=_HEATMAP_LABEL_COLOR)
 
     cell(0.0, 0.0, method_col_width, float(n_header), "white")
     ax.text(method_col_width / 2.0, n_header / 2.0, "Method", ha="center", va="center",
@@ -899,9 +896,9 @@ def plot_summary_heatmap(row_groups, save_path=None,
     tier_fontsize = fontsize - 1.5
     for block_key, block_label in block_list:
         if blocks:
-            _span_header(block_key, None, 0.0, block_label)
-        _span_header(block_key, "median", stat_row, "Median")
-        _span_header(block_key, "iqr", stat_row, "IQR")
+            _span_cell(block_key, None, 0.0, block_label)
+        _span_cell(block_key, "median", stat_row, "Median")
+        _span_cell(block_key, "iqr", stat_row, "IQR")
         for j, column in enumerate(data_cols):
             if column[0] != block_key:
                 continue
@@ -911,9 +908,7 @@ def plot_summary_heatmap(row_groups, save_path=None,
             ax.text(x0 + data_col_width / 2.0, tier_row + 0.5, label, ha="center",
                     va="center", fontsize=tier_fontsize, color=_HEATMAP_LABEL_COLOR)
 
-    # Body: every group contributes a full-width label row followed by one row
-    # per method.  The label rows are remembered so the vertical rules can stop
-    # at them.
+    # Body: metric label, optional reference row and one row per method.
     row = n_header
     full_width_rows = [0] if blocks else []
     for group in groups:
@@ -922,6 +917,15 @@ def plot_summary_heatmap(row_groups, save_path=None,
                 fontsize=fontsize + 1, fontweight="bold", color=_HEATMAP_LABEL_COLOR)
         full_width_rows.append(row)
         row += 1
+        if group["reference_values"]:
+            cell(0.0, row, method_col_width, 1.0, "white")
+            ax.text(method_col_width / 2.0, row + 0.5, group["reference_label"], ha="center",
+                    va="center", fontsize=fontsize + 1, color=_HEATMAP_LABEL_COLOR)
+            for block_key, _ in block_list:
+                value = group["reference_values"].get(block_key)
+                _span_cell(block_key, "median", row, _summary_fmt(value, decimals))
+                _span_cell(block_key, "iqr", row, "")
+            row += 1
         for method in group["methods"]:
             cell(0.0, row, method_col_width, 1.0, "white")
             ax.text(method_col_width / 2.0, row + 0.5, method, ha="center",

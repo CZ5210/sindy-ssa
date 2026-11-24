@@ -53,8 +53,8 @@ emergency **evasive** manoeuvre. Both are processed together.
   - `methods/` and `observation/` — the per-run intermediate thrust and
     observation files.
   The script `plot_batch_tiers.py` reads the `batch_evaluation.csv` tables and
-  regenerates the batch-tier, versus-window and summary-heatmap figures of the
-  paper.
+  the `zero_thrust_reference/` CSVs to regenerate the paper's batch figures
+  (see §8.4).
 - `data/<scenario>/{truth,typical,batch}` and `data/noise/` — generated CSV
   outputs (regenerable with the CLI).
 - `results/` — generated figures (regenerable; safe to delete).
@@ -67,8 +67,8 @@ emergency **evasive** manoeuvre. Both are processed together.
   目录为 `<window>/<scenario>/<tier>/`（`window` 取 `full`、`window30`、
   `window70`），其中 `batch_evaluation.csv` /
   `batch_summary.csv` 是论文所用的逐次与中位数/IQR 指标，`methods/` 与
-  `observation/` 为逐次中间文件。`plot_batch_tiers.py` 读取评估表即可复现论文的
-  batch-tier、vs-window 与汇总热图。
+  `observation/` 为逐次中间文件。`plot_batch_tiers.py` 读取评估表和
+  `zero_thrust_reference/` 中的 CSV，复现论文的批量图（见 §8.4）。
 - `data/<scenario>/{truth,typical,batch}`、`data/noise/` —— 生成的 CSV，可由 CLI 重跑。
 - `results/` —— 生成的图件，可删除后重跑。
 
@@ -109,6 +109,7 @@ sindy-ssa/
 │   ├── plotting/                # trajectory / thrust / heatmap / violin / noise figures
 │   ├── experiments/             # pipeline drivers (dynamics, sindy, batch, plotting)
 │   └── studies/                 # independent studies (noise, ballistic)
+├── generate_zero_thrust_reference.py  # standalone: zero-thrust reference CSVs
 ├── plot_batch_tiers.py          # standalone: batch-tier/heatmap figures from batch_archive
 ├── plot_dynamics.py             # standalone: truth/noise figures (Tavotto entry)
 ├── tavotto_registry.json        # Tavotto figure-editor registry (optional)
@@ -316,6 +317,38 @@ for every finished case.  **中文。** `sindy-ssa batch paper` 一条命令按�
 （全观测 + 两个部分窗口）重跑批量并归档到 `batch_archive/<window>/<scenario>/<case>/`，
 最后自动重建论文批量图；窗口列表、归档根目录等由 `configs/batch_run.yaml` 的
 `batch.paper:` 段控制，命令行参数可覆盖。
+
+#### Zero-thrust reference in the batch figures / 批量图的零推力基准
+
+The red dashed lines in `batch_tiers_*` and `batch_vs_window_*` now show the
+planar EPE and EI obtained by setting all three RTN thrust components to zero
+over the full batch evaluation grid. Each scenario uses the same reference
+at 30%, 70% and 100% observation. The summary heatmaps show one zero-thrust
+value per scenario and metric, spanning the High, Low and Ideal median
+columns. Both median cells turn black only when the EPE and EI for the same
+method, scenario, noise tier, window and metric dimension strictly exceed
+their references. Without a scenario's reference CSV, its dashed lines use
+the original thresholds and its heatmap cells receive no failure highlight.
+
+**中文。** `batch_tiers_*` 和 `batch_vs_window_*` 的红色虚线已调整为零推力基准。
+将完整评估网格上的 RTN 三个推力分量置零，沿用批处理的重传播和指标计算，得到平面
+EPE 和 EI。每个场景的 30%、70% 和 100% 观测窗口共用一组参考值。两张汇总热图
+按场景与指标合并 High、Low、Ideal 的中位数列显示零推力参考值，参考行的 IQR
+留空。同一方法、场景、噪声档、窗口和指标维度下，只有 EPE 与 EI 都严格超过
+各自参考值时，对应的两格中位数才同时涂黑。缺少参考 CSV 的场景沿用原红线阈值，
+热图不作涂黑标记。
+
+Run the standalone generator to refresh
+`batch_archive/zero_thrust_reference/{evasive,stationkeeping}.csv`, then re-render
+the figures from the archived batch results. The generator uses
+`configs/batch_run.yaml` and runs only the truth and zero-thrust propagations.
+**中文。** 以下命令先按 batch 配置独立生成两份参考 CSV，再用已有归档重画图，无需
+重跑蒙特卡洛批处理。
+
+```bash
+python generate_zero_thrust_reference.py --archive batch_archive
+python plot_batch_tiers.py --archive batch_archive --out results/paper
+```
 
 ### 8.5 Noise calibration / 噪声标定
 
