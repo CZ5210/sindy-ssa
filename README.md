@@ -108,7 +108,8 @@ sindy-ssa/
 │   ├── metrics/                 # EPE and EI
 │   ├── plotting/                # trajectory / thrust / heatmap / violin / noise figures
 │   ├── experiments/             # pipeline drivers (dynamics, sindy, batch, plotting)
-│   └── studies/                 # independent studies (noise, ballistic)
+│   └── studies/                 # independent studies (noise, ballistic, M3 FD error)
+│       └── m3_fd_error/         # M3 study entry point, report and summary CSV
 ├── generate_zero_thrust_reference.py  # standalone: zero-thrust reference CSVs
 ├── plot_batch_tiers.py          # standalone: batch-tier/heatmap figures from batch_archive
 ├── plot_dynamics.py             # standalone: truth/noise figures (Tavotto entry)
@@ -178,6 +179,9 @@ python plot_batch_tiers.py --archive batch_archive --out results/paper
 **中文。** 依次执行：噪声标定与真值动力学 → 四种典型工况重建 → 100 次蒙特卡洛批处理 →
 弹道系数不确定性研究（仅控制台输出）→ 由 `batch_archive/` 重建论文批量图。论文的三个观测窗口
 可用一条 `sindy-ssa batch paper` 跑完并自动归档（见 §8.4）。
+
+Run the M3 finite-difference study from the repository root with
+`python -m sindy_ssa.studies.m3_fd_error`. See the [M3 report](src/sindy_ssa/studies/m3_fd_error/report.md).
 
 ---
 
